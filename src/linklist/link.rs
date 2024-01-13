@@ -2,9 +2,9 @@ use super::node::Node;
 use super::{align_to_down, align_to_up};
 use core::ptr::null_mut;
 use xxos_log::info;
+use xxos_log::LOG;
 #[derive(Clone, Copy)]
 pub(crate) struct Linkedlist {
-    size: usize,
     head: *mut Node,
 }
 
@@ -33,14 +33,9 @@ impl Linkedlist {
     #[inline]
     pub const fn new() -> Self {
         Self {
-            size: 0,
             head: null_mut(),
         }
     }
-
-    // pub fn iter_mut(&mut self) -> Iter {
-    //     Iter { current: self.head }
-    // }
 
     pub fn iter(&self) -> Iter {
         Iter { current: self.head }
@@ -53,14 +48,10 @@ impl Linkedlist {
         }
         len
     }
-    pub fn size(&self) -> usize{
-        self.size
-    }
     pub unsafe fn init(&mut self, start: usize, end: usize, chunk_size: usize) {
         info!("algin before end: {}", end);
         let start = align_to_up(start, chunk_size);
         let end = align_to_down(end, chunk_size);
-        self.size = chunk_size;
         info!(
             "start: {:#x} end: {:#x} chunk_size: {:#x}",
             start, end, chunk_size
@@ -80,7 +71,6 @@ impl Linkedlist {
     }
 
     pub unsafe fn alloc<T>(&mut self) -> Option<*mut T> {
-        info!("alloc ");
         if self.head.is_null() {
             return None;
         }
@@ -90,7 +80,6 @@ impl Linkedlist {
     }
 
     pub unsafe fn dealloc(&mut self, address: usize) {
-        info!("now dealloc");
         let head = Node::to_current(address);
         assert!(!head.is_null());
         (*head).prev = self.head;
@@ -119,6 +108,7 @@ mod tests {
 
     #[test]
     fn it_works() {
+        use xxos_log::LOG;
         use std::println;
         use xxos_log::WriteLog;
         struct PT;
@@ -129,7 +119,7 @@ mod tests {
         }
         let heap = [0u8; 4096];
         unsafe {
-            init_log(&PT);
+            init_log(&PT,xxos_log::Level::INFO);
             let start = &heap as *const _ as usize;
             let end = &heap[4095] as *const _ as usize;
             std::println!("size {:#x} len {}", (end - start), (end - start) / 64);

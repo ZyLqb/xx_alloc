@@ -3,6 +3,7 @@ use core::{
     ops::{Index, IndexMut},
 
 };
+use xxos_log::LOG;
 
 use xx_mutex_lock::Mutex;
 use xxos_log::{error, info};
@@ -51,19 +52,15 @@ impl Heap {
         self.pool
             .index_mut(POLL_PGSZ)
             .init(bottom, top, PGSZ);
-        for i in 0..POLL_COUNT {
-            //self.pool.index_mut(i)
-        }
     }
-    unsafe fn allocate<T>(&mut self, index: usize) -> Option<*mut T> {
-        info!("allocate");
+    unsafe fn allocate<T>(&mut self, index: usize,size: usize) -> Option<*mut T> {
+        info!("allocate the index is {}",index);
         if let Some(ptr) = self.pool.index_mut(index).alloc::<T>() {
             info!("it alloced!");
             Some(ptr)
         } else {
             info!("it go find now page!");
-            let size = self.pool.index(index).len();
-            info!("it go find now page!");
+            info!("the size is {}!",size);
             let page = self
                 .pool
                 .index_mut(POLL_PGSZ)
@@ -75,7 +72,6 @@ impl Heap {
             let end = start + PGSZ;
             info!("go dealloc in {}",index);
             for address in (start..end).step_by(size) {
-                info!("address {}",address);
                 self.pool.index_mut(index).dealloc(address)
             }
             let ptr = self.pool.index_mut(index).alloc::<T>();
@@ -90,29 +86,29 @@ impl Heap {
         match fit_layout.size() {
             POLL_SIZE_32 => {
                 info!("allocer in 32");
-                ptr = self.allocate(POLL_32);
+                ptr = self.allocate(POLL_32,POLL_SIZE_32);
             }
             POLL_SIZE_64 => {
                 info!("allocer in 64");
-                ptr = self.allocate(POLL_64);
+                ptr = self.allocate(POLL_64,POLL_SIZE_64);
             }
             POLL_SIZE_128 => {
-                ptr = self.allocate(POLL_128);
+                ptr = self.allocate(POLL_128,POLL_SIZE_128);
             }
             POLL_SIZE_256 => {
-                ptr = self.allocate(POLL_256);
+                ptr = self.allocate(POLL_256,POLL_SIZE_256);
             }
             POLL_SIZE_512 => {
-                ptr = self.allocate(POLL_512);
+                ptr = self.allocate(POLL_512,POLL_SIZE_512);
             }
             POLL_SIZE_1024 => {
-                ptr = self.allocate(POLL_1024);
+                ptr = self.allocate(POLL_1024,POLL_SIZE_1024);
             }
             POLL_SIZE_2048 => {
-                ptr = self.allocate(POLL_2048);
+                ptr = self.allocate(POLL_2048,POLL_SIZE_2048);
             }
             POLL_SIZE_4096 => {
-                ptr = self.allocate(POLL_4096);
+                ptr = self.allocate(POLL_4096,POLL_SIZE_4096);
             }
             _ => {
                 info!("allocer start other");

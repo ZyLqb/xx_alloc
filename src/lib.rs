@@ -5,7 +5,6 @@
 #![feature(exclusive_range_pattern)]
 mod heap;
 mod linklist;
-
 pub use heap::LockedHeap;
 #[cfg(test)]
 mod tests {
@@ -22,18 +21,17 @@ mod tests {
     }
     #[test]
     fn test(){
-        init_log(&PT);
+        use xxos_log::LOG;
+        init_log(&PT,xxos_log::Level::INFO);
         let heap_arr = [0usize;4096*17];
         let bottom = &heap_arr[0] as *const _ as  usize;
         let top = &heap_arr[4096*17 -1 ] as *const _ as usize;
         unsafe {
             let mut heap = Heap::new_uninit();
             heap.init(bottom, top);
-            let layout = Layout::from_size_align(16, 8).unwrap();
-
+            let layout = Layout::from_size_align(290, 8).unwrap();
             let a = heap.allocate_fit(layout).unwrap();
             info!("a {}",a as usize)
         }
-        
     }
 }

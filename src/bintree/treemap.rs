@@ -49,6 +49,14 @@ impl TreeMap {
             *i = 0;
         }
     }
+
+    pub fn set_all_child(&mut self) {
+        todo!()
+    }
+
+    pub fn unset_all_child(&mut self) {
+        todo!()
+    }
 }
 
 #[cfg(test)]
@@ -62,7 +70,7 @@ pub mod tests {
     fn map_test() {
         let mut bitmap = TreeMap::new();
 
-        for i in 0..MAX_NODES {
+        for i in 0..MAX_PAGES {
             if !bitmap.get_bit(i) {
                 bitmap.set_bit(i);
                 assert!(bitmap.get_bit(i));
@@ -74,12 +82,12 @@ pub mod tests {
         }
 
         bitmap.set_bit_all();
-        for i in 0..MAX_NODES {
+        for i in 0..MAX_PAGES {
             assert!(bitmap.get_bit(i));
         }
 
         bitmap.unset_bit_all();
-        for i in 0..MAX_NODES {
+        for i in 0..MAX_PAGES {
             assert!(!bitmap.get_bit(i));
         }
     }

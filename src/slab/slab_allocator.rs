@@ -1,3 +1,7 @@
+use crate::{
+    align_up, is_align,
+    linklist::{def::*, link::Linkedlist},
+};
 use core::{
     alloc::Layout,
     ops::{Index, IndexMut},
@@ -5,11 +9,10 @@ use core::{
 use xxos_log::LOG;
 use xxos_log::{error, info};
 
-use crate::{
-    align_down, align_up,
-    linklist::{def::*, link::Linkedlist},
-};
-
+/// 小内存分配器
+/// 基于页内存分配器，使用了8 个内存池，分配对应大小的内存
+/// 最大不超过一个页，超过一个页则调用页内存分配器直接获取
+/// 对应大小内存
 pub struct SlabAllocator {
     pub(crate) pool: [Linkedlist; POOL_COUNT],
 }
@@ -17,14 +20,15 @@ pub struct SlabAllocator {
 unsafe impl Send for SlabAllocator {}
 
 impl SlabAllocator {
-    pub const fn new_uninit() -> Self {
+    pub const fn new() -> Self {
         Self {
             pool: [Linkedlist::new(); POOL_COUNT],
         }
     }
 
+    #[allow(unused)]
     pub fn is_pool_empty(&self, index: usize) -> bool {
-        !self.pool[index].is_empty()
+        self.pool[index].is_empty()
     }
 
     pub fn align_layout(layout: Layout) -> Result<Layout, ()> {
@@ -146,15 +150,11 @@ impl SlabAllocator {
                 let size = fit_layout.size();
                 let align_size = layout.align();
 
-                // BUG?
-                // is `len` not Linkedlist size?
-                if size > self.pool.index(POOL_PGSZ).len() {
+                if size > PGSZ {
                     error!("the alloc size is too big");
                     return Err(());
                 }
 
-                // I don't know what's use of layout
-                // align to layout
                 loop {
                     let ptr = self
                         .pool
@@ -162,7 +162,7 @@ impl SlabAllocator {
                         .pop::<u8>()
                         .expect("None value");
 
-                    if align_down!(ptr as usize, align_size) == 0 {
+                    if is_align!(ptr as usize, align_size) {
                         break;
                     } else {
                         // the preformance is prety poor

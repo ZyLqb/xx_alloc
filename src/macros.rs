@@ -19,6 +19,13 @@ macro_rules! align_up {
     };
 }
 
+#[macro_export]
+macro_rules! is_align {
+    ($size:expr, $align_size:expr) => {
+        ($size & ($align_size - 1)) == 0
+    };
+}
+
 #[cfg(test)]
 pub mod macro_test {
     extern crate std;

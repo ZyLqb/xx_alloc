@@ -1,9 +1,9 @@
+use super::{def::*, treemap::TreeMap};
 use crate::align_down;
 
-use super::{def::*, treemap::TreeMap};
-
+/// complete binary tree
 pub struct BinTree {
-    nodes: [usize; MAX_NODES],
+    nodes: [usize; MAX_PAGES],
     bitmap: TreeMap,
     level: usize,
 }
@@ -12,15 +12,24 @@ pub struct BinTree {
 impl BinTree {
     pub fn new() -> Self {
         Self {
-            nodes: [0; MAX_NODES],
+            nodes: [0; MAX_PAGES],
             bitmap: TreeMap::new(),
             level: 0,
         }
     }
 
-    pub fn generate(&mut self, root: usize, size: usize) -> Result<usize, &str> {
-        let mem_size = align_down!(size, MIN_SIZE);
-        let mem_counts = mem_size / MIN_SIZE;
+    pub fn init(&mut self, root: usize, size: usize) -> Result<usize, &str> {
+        let mut mem_size = align_down!(size, MIN_SIZE);
+        let mut page_counts = mem_size / MIN_SIZE;
+
+        while page_counts > 0 && !page_counts.is_power_of_two() {
+            page_counts -= 1;
+            mem_size -= MIN_SIZE;
+        }
+
+        if page_counts == 0 {
+            return Err("BinTree::init");
+        }
 
         for i in self.nodes.iter_mut() {
             (*i) = 0;
@@ -28,11 +37,11 @@ impl BinTree {
         self.bitmap.set_bit_all();
         self.level = 0;
 
-        if mem_counts > 0 {
+        if page_counts > 0 {
             let mut cur_size = mem_size;
             let mut counts = 0;
 
-            while counts <= mem_counts {
+            while counts < page_counts {
                 let mut current = root;
 
                 while current < (root + mem_size) {
@@ -47,14 +56,14 @@ impl BinTree {
                 self.level += 1;
             }
 
-            Ok(mem_counts)
+            Ok(page_counts)
         } else {
             Err("have wrong in generate")
         }
     }
 
     fn get_level(&self, size: usize) -> usize {
-        let mut index_size = size & !0xf;
+        let mut index_size = align_down!(size, MIN_SIZE);
         let mut level = self.level;
 
         while index_size >= MIN_SIZE {
@@ -96,23 +105,20 @@ pub mod tests {
         let mut tree1 = BinTree::new();
         let mut tree2 = BinTree::new();
         let mut tree3 = BinTree::new();
-        let _ = tree1.generate(0x10000, PGSZ);
-        let _ = tree2.generate(0x10000, PGSZ / 2);
-        let _ = tree3.generate(0x10000, PGSZ / 3);
+        let _ = tree1.init(0x10000, PGSZ);
+        let _ = tree2.init(0x10000, PGSZ * 2);
+        let _ = tree3.init(0x10000, PGSZ * 3);
 
         for i in 0..tree1.level {
-            // println!("{}", tree1.get_level(PGSZ / (1 << i)));
-            assert_eq!(i, tree1.get_level(PGSZ / (1 << i)));
+            assert_eq!(i, tree1.get_level(PGSZ * (1 >> i)));
         }
 
         for i in 0..tree2.level {
-            // println!("{}", tree2.get_level(PGSZ / (2 << i)));
-            assert_eq!(i, tree2.get_level(PGSZ / (2 << i)));
+            assert_eq!(i, tree2.get_level(PGSZ * (2 >> i)));
         }
 
         for i in 0..tree3.level {
-            // println!("{}", tree3.get_level(PGSZ / (3 << i)));
-            assert_eq!(i, tree3.get_level(PGSZ / (3 << i)));
+            assert_eq!(i, tree3.get_level(PGSZ * (2 >> i)));
         }
     }
 
@@ -121,22 +127,19 @@ pub mod tests {
         let mut tree1 = BinTree::new();
         let mut tree2 = BinTree::new();
         let mut tree3 = BinTree::new();
-        let _ = tree1.generate(0x10000, PGSZ);
-        let _ = tree2.generate(0x10000, PGSZ / 2);
-        let _ = tree3.generate(0x10000, PGSZ / 3);
+        let _ = tree1.init(0x10000, PGSZ);
+        let _ = tree2.init(0x10000, PGSZ * 2);
+        let _ = tree3.init(0x10000, PGSZ * 3);
 
         for i in 0..tree1.level {
-            // println!("{}", tree1.get_index(level));
             assert_eq!((2usize.pow(i as u32)) - 1, tree1.get_index(i));
         }
 
         for i in 0..tree2.level {
-            // println!("{}", tree2.get_index(level));
             assert_eq!((2usize.pow(i as u32)) - 1, tree2.get_index(i));
         }
 
         for i in 0..tree3.level {
-            // println!("{}", tree3.get_index(level));
             assert_eq!((2usize.pow(i as u32)) - 1, tree3.get_index(i));
         }
     }
@@ -144,7 +147,7 @@ pub mod tests {
     #[test]
     fn find_test() {
         let mut tree = BinTree::new();
-        let _ = tree.generate(0x10000, PGSZ);
+        let _ = tree.init(0x10000, PGSZ);
 
         match tree.find(PGSZ) {
             Ok(idx) => assert_eq!(0, idx),
@@ -155,21 +158,21 @@ pub mod tests {
     }
 
     #[test]
-    fn generate_test() {
+    fn init_test() {
         let mut tree = BinTree::new();
         let mut bad_tree = BinTree::new();
 
-        let gen_success = tree.generate(0x10000, PGSZ);
-        let gen_error = bad_tree.generate(0x10000, 0xf);
+        let gen_success = tree.init(0x10000, PGSZ * 15);
+        let gen_error = bad_tree.init(0x10000, PGSZ / 2);
 
         assert!(gen_error.is_err());
-        assert!(gen_success.is_ok());
+        assert_eq!(Ok(8), gen_success);
 
         let root = tree.nodes[0];
 
         for level in 0..tree.level {
             let mut idx = tree.get_index(level);
-            for i in (root..(root + PGSZ)).step_by(PGSZ >> level) {
+            for i in (root..(root + PGSZ * 8)).step_by((PGSZ * 8) >> level) {
                 assert_eq!(i, tree.nodes[idx]);
                 idx += 1;
             }

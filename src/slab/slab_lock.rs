@@ -1,4 +1,4 @@
-use super::slab::SlabAllocator;
+use super::slab_allocator::SlabAllocator;
 use core::alloc::{GlobalAlloc, Layout};
 use xx_mutex_lock::Mutex;
 
@@ -8,7 +8,7 @@ unsafe impl Send for LockedSlab {}
 
 impl LockedSlab {
     pub const fn new() -> Self {
-        let heap = SlabAllocator::new_uninit();
+        let heap = SlabAllocator::new();
         LockedSlab(Mutex::new(heap))
     }
     pub fn init(&self, bottom: usize, top: usize) {

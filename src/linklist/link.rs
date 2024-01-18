@@ -1,5 +1,4 @@
-use crate::align_down;
-use crate::align_up;
+use crate::{align_down, align_up};
 
 use super::node::Node;
 use core::ptr::null_mut;
@@ -9,6 +8,7 @@ use xxos_log::LOG;
 #[derive(Clone, Copy)]
 pub(crate) struct Linkedlist {
     head: *mut Node,
+    tail: *mut Node,
 }
 
 pub struct LinkedlistIter {
@@ -37,7 +37,10 @@ impl Iterator for LinkedlistIter {
 impl Linkedlist {
     #[inline]
     pub const fn new() -> Self {
-        Self { head: null_mut() }
+        Self {
+            head: null_mut(),
+            tail: null_mut(),
+        }
     }
 
     pub fn iter(&self) -> LinkedlistIter {
@@ -69,6 +72,8 @@ impl Linkedlist {
         info!("start after align: {:#x}", start);
         info!("end after align: {:#x}", end);
 
+        self.tail = Node::to_mut_node_ptr(start);
+
         for address in (start..end).step_by(chunk_size) {
             let head = Node::to_mut_node_ptr(address);
             if address + chunk_size == end {
@@ -89,6 +94,11 @@ impl Linkedlist {
         if !self.head.is_null() {
             let head = self.head;
             self.head = (*head).next;
+
+            if self.is_empty() {
+                self.tail = null_mut();
+            }
+
             Some(head as *mut T)
         } else {
             None
@@ -105,22 +115,18 @@ impl Linkedlist {
     }
 
     pub unsafe fn push_tail(&mut self, address: usize) {
-        let tail = Node::to_mut_node_ptr(address);
+        let tail = self.tail;
+        let new = Node::to_mut_node_ptr(address);
         assert!(!tail.is_null());
 
-        let mut current = self.head;
-        while !(*(self.head)).next.is_null() {
-            current = (*current).next
-        }
-
-        (*current).next = tail;
-        (*tail).next = null_mut();
+        (*tail).next = new;
+        (*new).next = null_mut();
     }
 }
 
 #[cfg(test)]
 mod tests {
-    use xxos_log::{info, init_log};
+    use xxos_log::init_log;
 
     use super::*;
     use crate::linklist::def::POOL_SIZE_64;

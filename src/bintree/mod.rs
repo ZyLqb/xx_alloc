@@ -1,3 +1,3 @@
-pub mod def;
+pub(crate) mod def;
 pub mod tree;
-pub mod treemap;
+pub(crate) mod treemap;

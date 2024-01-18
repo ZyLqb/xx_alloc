@@ -2,19 +2,21 @@ use super::def::MAX_ARRAY;
 
 pub struct TreeMap([u8; MAX_ARRAY]);
 
-#[allow(dead_code)]
+impl Default for TreeMap {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl TreeMap {
-    pub fn new(bit: bool) -> Self {
-        if bit {
-            Self([0xff; MAX_ARRAY])
-        } else {
-            Self([0; MAX_ARRAY])
-        }
+    pub fn new() -> Self {
+        Self([0; MAX_ARRAY])
     }
 
     pub fn get_bit(&self, idx: usize) -> bool {
         let byte_index = idx / 8;
         let bit_index = idx % 8;
+
         (self.0[byte_index] & (1 << bit_index)) != 0
     }
 
@@ -22,6 +24,7 @@ impl TreeMap {
         if !self.get_bit(idx) {
             let byte_index = idx / 8;
             let bit_index = idx % 8;
+
             self.0[byte_index] |= 1 << bit_index;
         }
     }
@@ -30,7 +33,20 @@ impl TreeMap {
         if self.get_bit(idx) {
             let byte_index = idx / 8;
             let bit_index = idx % 8;
+
             self.0[byte_index] &= !(1 << bit_index);
+        }
+    }
+
+    pub fn set_bit_all(&mut self) {
+        for i in self.0.iter_mut() {
+            *i = !0;
+        }
+    }
+
+    pub fn unset_bit_all(&mut self) {
+        for i in self.0.iter_mut() {
+            *i = 0;
         }
     }
 }
@@ -44,28 +60,27 @@ pub mod tests {
 
     #[test]
     fn map_test() {
-        let mut bitmap_empty = TreeMap::new(false);
-        let mut bitmap_full = TreeMap::new(true);
+        let mut bitmap = TreeMap::new();
 
         for i in 0..MAX_NODES {
-            if !bitmap_empty.get_bit(i) {
-                bitmap_empty.set_bit(i);
-                assert!(bitmap_empty.get_bit(i));
-                bitmap_empty.unset_bit(i);
-                assert!(!bitmap_empty.get_bit(i));
+            if !bitmap.get_bit(i) {
+                bitmap.set_bit(i);
+                assert!(bitmap.get_bit(i));
+                bitmap.unset_bit(i);
+                assert!(!bitmap.get_bit(i));
             } else {
                 panic!();
             }
         }
+
+        bitmap.set_bit_all();
         for i in 0..MAX_NODES {
-            if bitmap_full.get_bit(i) {
-                bitmap_full.unset_bit(i);
-                assert!(!bitmap_full.get_bit(i));
-                bitmap_full.set_bit(i);
-                assert!(bitmap_full.get_bit(i));
-            } else {
-                panic!();
-            }
+            assert!(bitmap.get_bit(i));
+        }
+
+        bitmap.unset_bit_all();
+        for i in 0..MAX_NODES {
+            assert!(!bitmap.get_bit(i));
         }
     }
 }

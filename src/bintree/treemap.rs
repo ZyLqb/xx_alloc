@@ -1,6 +1,8 @@
-use super::def::MAX_ARRAY;
+use super::def::MAX_PAGES;
 
-pub struct TreeMap([u8; MAX_ARRAY]);
+#[derive(Debug)]
+#[repr(C)]
+pub struct TreeMap([u8; MAX_PAGES]);
 
 impl Default for TreeMap {
     fn default() -> Self {
@@ -10,7 +12,7 @@ impl Default for TreeMap {
 
 impl TreeMap {
     pub fn new() -> Self {
-        Self([0; MAX_ARRAY])
+        Self([0; MAX_PAGES])
     }
 
     pub fn get_bit(&self, idx: usize) -> bool {
@@ -50,12 +52,13 @@ impl TreeMap {
         }
     }
 
-    pub fn set_all_child(&mut self) {
-        todo!()
-    }
-
-    pub fn unset_all_child(&mut self) {
-        todo!()
+    pub fn mul_get_bit(&self, index: usize, counts: usize) -> bool {
+        for i in 0..counts {
+            if self.get_bit(index + i) {
+                return false;
+            }
+        }
+        true
     }
 }
 

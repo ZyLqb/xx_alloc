@@ -9,7 +9,8 @@ mod linklist;
 mod macros;
 mod slab;
 
-pub use bintree::treemap::TreeMap;
+//pub use bintree::treemap::TreeMap;
+pub use buddy::buddy_allocator::BuddyAllocator;
 pub use slab::slab_lock::LockedSlab;
 
 //#[cfg(test)]

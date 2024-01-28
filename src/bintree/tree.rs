@@ -1,44 +1,48 @@
 use super::{def::*, treemap::TreeMap};
-use crate::{align_down, is_align};
+use crate::align_down;
 
-/// complete binary tree
+// 完全二叉树
 #[repr(C)]
 #[derive(Debug)]
 pub struct BinTree {
-    pub level: usize,
-    nodes: [usize; MAX_PAGES],
-    pub bitmap: TreeMap,
+    pub level: usize,          // 树的高度
+    nodes: [usize; MAX_NODES], // 节点数组
+    pub bitmap: TreeMap,       // 位图
 }
 
 #[allow(unused)]
 impl BinTree {
     pub fn new() -> Self {
         Self {
-            nodes: [0; MAX_PAGES],
+            nodes: [0; MAX_NODES],
             bitmap: TreeMap::new(),
             level: 0,
         }
     }
 
+    // 初始化完全二叉树
     pub fn init(&mut self, root: usize, size: usize) -> Result<usize, &str> {
         let mut mem_size = align_down!(size, MIN_SIZE);
         let mut page_counts = mem_size / MIN_SIZE;
 
+        // 只能管理2的幂个数的页
         while page_counts > 0 && !page_counts.is_power_of_two() {
             page_counts -= 1;
             mem_size -= MIN_SIZE;
         }
 
-        self.bitmap.set_bit_all();
-
         if page_counts == 0 {
             return Err("BinTree::init");
         }
+
+        // 先将所有页的bit位设置为1(used)
+        self.bitmap.set_bit_all();
 
         let node_counts = page_counts * 2 - 1;
         let mut cur_size = mem_size;
         let mut counts = 0;
 
+        // 将页地址放入二叉树中，每放入一个则设置其bit位为0(unused)
         while counts < node_counts {
             let mut current = root;
 
@@ -57,6 +61,7 @@ impl BinTree {
         Ok(page_counts)
     }
 
+    // 获取对应size的节点位于树的高度
     pub fn get_level(&self, size: usize) -> usize {
         let mut index_size = align_down!(size, MIN_SIZE);
         let mut level = self.level;
@@ -69,15 +74,20 @@ impl BinTree {
         level
     }
 
+    // 获取对应高度的节点索引
     pub fn get_index(&self, level: usize) -> usize {
         2usize.pow((level - 1) as u32) - 1
     }
 
+    // 获取节点的内容
     pub fn get_value(&self, idx: usize) -> usize {
         self.nodes[idx]
     }
 
     // 进行适配搜索
+    // TODO
+    // 目前只能找到第一个适合(used or unused)的节点，如果能返回一个迭代器或者数组
+    // 也就是所有适合的节点，将更方便
     pub fn find_unused(&self, size: usize) -> Result<usize, &str> {
         if size > MAX_SIZE {
             return Err("BinTree::find");
@@ -85,7 +95,7 @@ impl BinTree {
 
         let level = self.get_level(size);
 
-        // verify bitmap
+        // 寻找并检验bit位为unused的节点
         let mut idx = self.get_index(level);
         while idx < (self.get_index(level + 1) - 1) {
             if !self.bitmap.get_bit(idx) {
@@ -106,6 +116,7 @@ impl BinTree {
                 idx += 1;
             }
         }
+
         Ok(idx)
     }
 
@@ -116,7 +127,7 @@ impl BinTree {
 
         let level = self.get_level(size);
 
-        // verify bitmap
+        // 寻找并检验bit位为used的节点
         let mut idx = self.get_index(level);
         let max_idx = self.get_index(level + 1) - 1;
         while idx < max_idx {
@@ -130,10 +141,12 @@ impl BinTree {
         Ok(idx)
     }
 
+    // 获取树的最大节点数
     pub fn max_node(&self) -> usize {
         self.get_index(self.level + 1) - 1
     }
 
+    // 批量设置子树的bit位为used
     pub fn use_mem(&mut self, idx: usize) {
         let mut left_leaf = idx;
         let mut level = 0;
@@ -148,6 +161,7 @@ impl BinTree {
         }
     }
 
+    // 批量设置子树的bit位为unused
     pub fn unuse_mem(&mut self, idx: usize) {
         let mut left_leaf = idx;
         let mut level = 0;
@@ -162,22 +176,27 @@ impl BinTree {
         }
     }
 
+    // 仅设置一个bit位为used
     pub fn use_page(&mut self, idx: usize) {
         self.bitmap.set_bit(idx);
     }
 
+    // 仅设置一个bit位为unused
     pub fn unuse_page(&mut self, idx: usize) {
         self.bitmap.unset_bit(idx);
     }
 
+    // 找到对应节点的左孩子
     pub fn find_left_child(&self, idx: usize) -> usize {
         idx * 2 + 1
     }
 
+    // 找到对应节点的右孩子
     pub fn find_right_child(&self, idx: usize) -> usize {
         idx * 2 + 2
     }
 
+    // 找到对应节点的父亲
     pub fn find_parent(&self, idx: usize) -> usize {
         (idx + 1) / 2 - 1
     }

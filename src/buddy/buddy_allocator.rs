@@ -1,41 +1,43 @@
-use super::def::PAGE_SIZE;
+use super::def::{MemPtr, MAX_PAGES, PAGE_SIZE};
 
-use crate::{
-    align_down, align_up,
-    bintree::{
-        def::{MAX_SIZE, MIN_SIZE},
-        tree::BinTree,
-    },
-    is_align,
-};
+use crate::{align_down, align_up, bintree::tree::BinTree, is_align};
 use core::mem::size_of;
-
-type MemPtr = usize;
 
 /// 页内存分配器
 /// 用来分配连续的页内存，使用完全二叉树来管理
 /// 因此管理的页数为2的幂
+/// Example:
+/// ```
+/// let mut buddy = BuddyAllocator::new(bottom, top);
+/// let mut addr1 = buddy.allocate(PAGE_SIZE);
+/// let mut addr2 = buddy.allocate(PAGE_SIZE << 1);
+/// let _ = buddy.deallocate(addr1.unwrap(), PAGE_SIZE);
+/// ```
 #[derive(Debug)]
 pub struct BuddyAllocator {
-    zone: *mut BinTree,
-    page_counts: usize,
+    zone: *mut BinTree, // 二叉树
+    page_counts: usize, // 剩余空闲页
 }
 
 #[allow(unused)]
 impl BuddyAllocator {
-    fn new(bottom: MemPtr, top: MemPtr) -> Self {
+    pub fn new(bottom: MemPtr, top: MemPtr) -> Self {
         let start = align_up!(bottom, PAGE_SIZE);
         let end = align_down!(top, PAGE_SIZE);
         let mut zone = start as *mut BinTree;
         let mut page_counts = (end - start) / PAGE_SIZE + 1;
 
-        if page_counts > MAX_SIZE {
+        if page_counts > MAX_PAGES {
             panic!("size too big.");
         }
 
         unsafe {
+            // 初始化zone
+            // 需要起始地址和总内存大小
             match (*zone).init(start, PAGE_SIZE * page_counts) {
                 Ok(counts) => {
+                    // 由于直接使用待管理内存的前几页保存该分配器
+                    // 因此设置前三页为used
                     let used = align_up!(size_of::<BinTree>(), PAGE_SIZE) / PAGE_SIZE;
                     let index = (*zone).get_index((*zone).level);
 
@@ -52,6 +54,7 @@ impl BuddyAllocator {
         Self { zone, page_counts }
     }
 
+    // 分配内存，需要提供待分配内存大小
     pub fn allocate(&mut self, size: usize) -> Result<MemPtr, &'static str> {
         let mem_size = align_up!(size, PAGE_SIZE);
 
@@ -59,12 +62,14 @@ impl BuddyAllocator {
             Err("page is not enough")
         } else {
             let mut addr = 0;
-            let counts = size / MIN_SIZE;
+            let counts = size / PAGE_SIZE;
 
             if counts > self.page_counts {
                 return Err("buddy::allocate: have not enough page");
             }
 
+            // 剩余页面足够时，找到对应的unused节点并设置为used
+            // 剩余页面减少
             unsafe {
                 if let Ok(idx) = (*self.zone).find_unused(mem_size) {
                     addr = (*self.zone).get_value(idx);
@@ -79,14 +84,23 @@ impl BuddyAllocator {
         }
     }
 
+    // 释放内存，需要提供起始地址和内存大小
     pub fn deallocate(&mut self, addr: MemPtr, size: usize) -> Result<usize, &'static str> {
-        let counts = size / MIN_SIZE;
-        if is_align!(addr, MIN_SIZE) && is_align!(size, MIN_SIZE) {
+        let counts = size / PAGE_SIZE;
+
+        // 地址和大小需要对齐
+        if is_align!(addr, PAGE_SIZE) && is_align!(size, PAGE_SIZE) {
+            let mut idx = 0;
+            let mut max_idx = 0;
+
             unsafe {
-                let mut idx = (*self.zone).find_used(size).unwrap();
-                let max_node = (*self.zone).max_node();
-                while idx < max_node {
-                    if addr == (*self.zone).get_value(idx) {
+                // 找到对应节点并设置其为unused
+                // 主要是遍历该高度的每一个节点，待改进二叉树的find
+                idx = (*self.zone).find_used(size).unwrap();
+                max_idx = (*self.zone).get_index((*self.zone).get_level(size) + 1);
+
+                while idx < max_idx {
+                    if (*self.zone).bitmap.get_bit(idx) && addr == (*self.zone).get_value(idx) {
                         (*self.zone).unuse_mem(idx);
                         break;
                     }
@@ -95,8 +109,12 @@ impl BuddyAllocator {
                 }
             }
 
-            self.page_counts += counts;
-            Ok(self.page_counts)
+            if idx == max_idx {
+                Err("wrong")
+            } else {
+                self.page_counts += counts;
+                Ok(self.page_counts)
+            }
         } else {
             Err("addr or size is wrong")
         }
@@ -205,9 +223,5 @@ pub mod buddy_tests {
                 panic!("{}", err)
             }
         }
-
-        /* unsafe {
-            info!("{:x?}", (*buddy.zone).bitmap);
-        } */
     }
 }

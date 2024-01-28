@@ -1,3 +1,7 @@
+use crate::bintree::def::MAX_LEAF;
 use crate::linklist::def::PGSZ;
 
-pub const PAGE_SIZE: usize = PGSZ;
+pub(crate) const PAGE_SIZE: usize = PGSZ;
+pub(crate) const MAX_PAGES: usize = MAX_LEAF;
+
+pub type MemPtr = usize;

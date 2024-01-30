@@ -1,7 +1,7 @@
 use super::def::{MemPtr, MAX_PAGES, PAGE_SIZE};
 
 use crate::{align_down, align_up, bintree::tree::BinTree, is_align};
-use core::mem::size_of;
+use core::{mem::size_of, ptr::null_mut};
 
 /// 页内存分配器
 /// 用来分配连续的页内存，使用完全二叉树来管理
@@ -21,7 +21,17 @@ pub struct BuddyAllocator {
 
 #[allow(unused)]
 impl BuddyAllocator {
-    pub const fn new(bottom: MemPtr, top: MemPtr) -> Self {
+    pub const fn new() -> Self {
+        Self {
+            zone: null_mut(),
+            page_counts: 0,
+        }
+    }
+
+    // 初始化zone
+    // 需要起始地址和总内存大小
+    /// # Safety
+    pub unsafe fn init(&mut self, bottom: MemPtr, top: MemPtr) {
         let start = align_up!(bottom, PAGE_SIZE);
         let end = align_down!(top, PAGE_SIZE);
         let mut zone = start as *mut BinTree;
@@ -31,28 +41,20 @@ impl BuddyAllocator {
             panic!("size too big.");
         }
 
-        Self { zone, page_counts }
-    }
+        match (*self.zone).init(self.zone as usize, PAGE_SIZE * self.page_counts) {
+            Ok(counts) => {
+                // 由于直接使用待管理内存的前几页保存该分配器
+                // 因此设置前三页为used
+                let used = align_up!(size_of::<BinTree>(), PAGE_SIZE) / PAGE_SIZE;
+                let index = (*self.zone).get_index((*self.zone).level);
 
-    // 初始化zone
-    // 需要起始地址和总内存大小
-    pub fn init(&mut self) {
-        unsafe {
-            match (*self.zone).init(self.zone as usize, PAGE_SIZE * self.page_counts) {
-                Ok(counts) => {
-                    // 由于直接使用待管理内存的前几页保存该分配器
-                    // 因此设置前三页为used
-                    let used = align_up!(size_of::<BinTree>(), PAGE_SIZE) / PAGE_SIZE;
-                    let index = (*self.zone).get_index((*self.zone).level);
-
-                    for i in 0..used {
-                        (*self.zone).use_page(index + i);
-                    }
-
-                    self.page_counts = counts - used;
+                for i in 0..used {
+                    (*self.zone).use_page(index + i);
                 }
-                Err(err) => panic!("{}", err),
+
+                self.page_counts = counts - used;
             }
+            Err(err) => panic!("{}", err),
         }
     }
 
@@ -115,6 +117,7 @@ impl BuddyAllocator {
 }
 
 #[cfg(test)]
+#[allow(unused_imports)]
 pub mod buddy_tests {
     extern crate std;
     use super::BuddyAllocator;
@@ -148,8 +151,8 @@ pub mod buddy_tests {
             bottom, top
         );
 
-        let mut buddy = BuddyAllocator::new(bottom, top);
-        buddy.init();
+        let mut buddy = BuddyAllocator::new();
+        unsafe { buddy.init(bottom, top) };
 
         assert_eq!(align_up!(bottom, MIN_SIZE), buddy.zone as usize);
 

@@ -121,6 +121,7 @@ impl Linkedlist {
 
         (*tail).next = new;
         (*new).next = null_mut();
+        self.tail = new;
     }
 }
 

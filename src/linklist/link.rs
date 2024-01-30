@@ -3,7 +3,6 @@ use crate::{align_down, align_up};
 use super::node::Node;
 use core::ptr::null_mut;
 use xxos_log::info;
-use xxos_log::LOG;
 
 #[derive(Clone, Copy)]
 pub(crate) struct Linkedlist {

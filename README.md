@@ -10,9 +10,6 @@ pub struct Hole{
 }
 ```
 
-
-1111 >> 1
-
 ## TODO
 
 - 创建错误类型

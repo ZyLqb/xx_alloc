@@ -6,7 +6,6 @@ use core::{
     alloc::Layout,
     ops::{Index, IndexMut},
 };
-use xxos_log::LOG;
 use xxos_log::{error, info};
 
 /// 小内存分配器
@@ -165,7 +164,6 @@ impl SlabAllocator {
                     if is_align!(ptr as usize, align_size) {
                         break;
                     } else {
-                        // the preformance is prety poor
                         self.pool.index_mut(POOL_PGSZ).push_tail(ptr as usize);
                     }
                 }

@@ -129,7 +129,6 @@ pub mod buddy_tests {
     use crate::bintree::def::MIN_SIZE;
     use crate::buddy::def::PAGE_SIZE;
     use std::{panic, println};
-    use xxos_log::LOG;
     use xxos_log::{info, init_log, WriteLog};
     struct PT;
 

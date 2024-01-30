@@ -61,7 +61,7 @@ impl BinTree {
         Ok(page_counts)
     }
 
-    // 获取对应size的节点位于树的高度
+    // 根据size获取对应节点位于树的高度
     pub fn get_level(&self, size: usize) -> usize {
         let mut index_size = align_down!(size, MIN_SIZE);
         let mut level = self.level;
@@ -74,12 +74,12 @@ impl BinTree {
         level
     }
 
-    // 获取对应高度的节点索引
+    // 根据高度(level)获取对应节点的索引
     pub fn get_index(&self, level: usize) -> usize {
         2usize.pow((level - 1) as u32) - 1
     }
 
-    // 获取节点的内容
+    // 根据索引获取对应节点的内容
     pub fn get_value(&self, idx: usize) -> usize {
         self.nodes[idx]
     }
@@ -88,17 +88,17 @@ impl BinTree {
     // TODO
     // 目前只能找到第一个适合(used or unused)的节点，如果能返回一个迭代器或者数组
     // 也就是所有适合的节点，将更方便
-    pub fn find_unused(&self, size: usize) -> Result<usize, &str> {
+    pub fn find(&self, size: usize, is_used: bool) -> Result<usize, &str> {
         if size > MAX_SIZE {
             return Err("BinTree::find");
         }
 
-        let level = self.get_level(size);
-
         // 寻找并检验bit位为unused的节点
+        let level = self.get_level(size);
         let mut idx = self.get_index(level);
+
         while idx < (self.get_index(level + 1) - 1) {
-            if !self.bitmap.get_bit(idx) {
+            if self.bitmap.is_empty(idx) != is_used {
                 let mut left_leaf = idx;
                 
                 while self.find_left_child(left_leaf) <= self.max_node() {
@@ -107,38 +107,43 @@ impl BinTree {
 
                 let mut page_counts = size / MIN_SIZE;
                 let mut page = 0;
-                if self.bitmap.mul_get_bit(left_leaf, page_counts) {
+
+                if is_used && self.can_free(left_leaf, page_counts)
+                    || !is_used && self.can_use(left_leaf, page_counts)
+                {
                     break;
-                } else {
-                    idx += 1;
                 }
-            } else {
-                idx += 1;
-            }
-        }
-
-        Ok(idx)
-    }
-
-    pub fn find_used(&self, size: usize) -> Result<usize, &str> {
-        if size > MAX_SIZE {
-            return Err("BinTree::find");
-        }
-
-        let level = self.get_level(size);
-
-        // 寻找并检验bit位为used的节点
-        let mut idx = self.get_index(level);
-        let max_idx = self.get_index(level + 1) - 1;
-        while idx < max_idx {
-            if self.bitmap.get_bit(idx) {
-                break;
             }
 
             idx += 1;
         }
 
-        Ok(idx)
+        if idx == self.get_index(level + 1) {
+            Err("wrong")
+        } else {
+            Ok(idx)
+        }
+    }
+
+    pub fn find_match(&self, size: usize, value: usize, is_used: bool) -> Result<usize, &str> {
+        if size > MAX_SIZE {
+            return Err("BinTree::find");
+        }
+
+        // 找到第一个适合的节点
+        // 接着遍历之后每个节点，待改进find，能够返回多个适合的节点
+        let level = self.get_level(size);
+        let max_idx = self.get_index(level + 1);
+        let mut idx = self.find(size, is_used).unwrap();
+
+        while idx < max_idx {
+            if self.get_value(idx) == value {
+                return Ok(idx);
+            }
+            idx += 1;
+        }
+
+        Err("wrong")
     }
 
     // 获取树的最大节点数
@@ -199,6 +204,25 @@ impl BinTree {
     // 找到对应节点的父亲
     pub fn find_parent(&self, idx: usize) -> usize {
         (idx + 1) / 2 - 1
+    }
+
+    // 批量获取对应bit位，若全为1则为1，否则为0
+    pub fn can_use(&self, index: usize, counts: usize) -> bool {
+        for i in 0..counts {
+            if !self.bitmap.is_empty(index + i) {
+                return false;
+            }
+        }
+        true
+    }
+
+    pub fn can_free(&self, index: usize, counts: usize) -> bool {
+        for i in 0..counts {
+            if self.bitmap.is_empty(index + i) {
+                return false;
+            }
+        }
+        true
     }
 }
 
@@ -265,14 +289,17 @@ pub mod tests {
     #[test]
     fn find_test() {
         let mut tree = BinTree::new();
-        let _ = tree.init(0x10000, PGSZ);
+        let _ = tree.init(0x10000, PGSZ << 1);
 
-        match tree.find_unused(PGSZ) {
-            Ok(idx) => assert_eq!(0, idx),
-            Err(err) => {
-                panic!("{}", err);
-            }
-        }
+        assert!(tree.find(PGSZ << 1, false).is_ok());
+        assert_eq!(0, tree.find(PGSZ << 1, false).unwrap());
+        assert!(tree.find(PGSZ, false).is_ok());
+        assert_eq!(1, tree.find(PGSZ, false).unwrap());
+        tree.bitmap.set_bit(1);
+        assert!(tree.find(PGSZ, false).is_ok());
+        assert_eq!(2, tree.find(PGSZ, false).unwrap());
+        assert!(tree.find(PGSZ, true).is_ok());
+        assert_eq!(1, tree.find(PGSZ, true).unwrap());
     }
 
     #[test]

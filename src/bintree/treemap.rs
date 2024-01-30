@@ -18,41 +18,27 @@ impl TreeMap {
     }
 
     // 获取对应bit位
-    pub fn get_bit(&self, idx: usize) -> bool {
+    pub fn is_empty(&self, idx: usize) -> bool {
         let byte_index = idx / 8;
         let bit_index = idx % 8;
 
-        (self.0[byte_index] & (1 << bit_index)) != 0
-    }
-
-    // 批量获取对应bit位，若全为1则为1，否则为0
-    pub fn mul_get_bit(&self, index: usize, counts: usize) -> bool {
-        for i in 0..counts {
-            if self.get_bit(index + i) {
-                return false;
-            }
-        }
-        true
+        (self.0[byte_index] & (1 << bit_index)) == 0
     }
 
     // 设置对应bit位为1
     pub fn set_bit(&mut self, idx: usize) {
-        if !self.get_bit(idx) {
-            let byte_index = idx / 8;
-            let bit_index = idx % 8;
+        let byte_index = idx / 8;
+        let bit_index = idx % 8;
 
-            self.0[byte_index] |= 1 << bit_index;
-        }
+        self.0[byte_index] |= 1 << bit_index;
     }
 
     // 设置对应bit位为0
     pub fn unset_bit(&mut self, idx: usize) {
-        if self.get_bit(idx) {
-            let byte_index = idx / 8;
-            let bit_index = idx % 8;
+        let byte_index = idx / 8;
+        let bit_index = idx % 8;
 
-            self.0[byte_index] &= !(1 << bit_index);
-        }
+        self.0[byte_index] &= !(1 << bit_index);
     }
 
     // 设置全部bit位为1
@@ -82,11 +68,11 @@ pub mod tests {
         let mut bitmap = TreeMap::new();
 
         for i in 0..MAX_NODES {
-            if !bitmap.get_bit(i) {
+            if bitmap.is_empty(i) {
                 bitmap.set_bit(i);
-                assert!(bitmap.get_bit(i));
+                assert!(!bitmap.is_empty(i));
                 bitmap.unset_bit(i);
-                assert!(!bitmap.get_bit(i));
+                assert!(bitmap.is_empty(i));
             } else {
                 panic!();
             }
@@ -94,12 +80,12 @@ pub mod tests {
 
         bitmap.set_bit_all();
         for i in 0..MAX_NODES {
-            assert!(bitmap.get_bit(i));
+            assert!(!bitmap.is_empty(i));
         }
 
         bitmap.unset_bit_all();
         for i in 0..MAX_NODES {
-            assert!(!bitmap.get_bit(i));
+            assert!(bitmap.is_empty(i));
         }
     }
 }

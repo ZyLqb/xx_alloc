@@ -1,6 +1,13 @@
 use super::{def::*, treemap::TreeMap};
 use crate::align_down;
 
+#[derive(Debug)]
+pub enum TreeErr {
+    NotEnough,
+    NotFound,
+    WrongSize,
+}
+
 // 完全二叉树
 #[repr(C)]
 #[derive(Debug)]
@@ -21,24 +28,24 @@ impl BinTree {
     }
 
     // 初始化完全二叉树
-    pub fn init(&mut self, root: usize, size: usize) -> Result<usize, &str> {
+    pub fn init(&mut self, root: usize, size: usize) -> Result<usize, TreeErr> {
         let mut mem_size = align_down!(size, MIN_SIZE);
-        let mut page_counts = mem_size / MIN_SIZE;
+        let mut leaf_counts = mem_size / MIN_SIZE;
 
         // 只能管理2的幂个数的页
-        while page_counts > 0 && !page_counts.is_power_of_two() {
-            page_counts -= 1;
+        while leaf_counts > 0 && !leaf_counts.is_power_of_two() {
+            leaf_counts -= 1;
             mem_size -= MIN_SIZE;
         }
 
-        if page_counts == 0 {
-            return Err("BinTree::init");
+        if leaf_counts == 0 {
+            return Err(TreeErr::NotEnough);
         }
 
         // 先将所有页的bit位设置为1(used)
         self.bitmap.set_bit_all();
 
-        let node_counts = page_counts * 2 - 1;
+        let node_counts = leaf_counts * 2 - 1;
         let mut cur_size = mem_size;
         let mut counts = 0;
 
@@ -58,7 +65,7 @@ impl BinTree {
             self.level += 1;
         }
 
-        Ok(page_counts)
+        Ok(leaf_counts)
     }
 
     // 根据size获取对应节点位于树的高度
@@ -88,9 +95,9 @@ impl BinTree {
     // TODO
     // 目前只能找到第一个适合(used or unused)的节点，如果能返回一个迭代器或者数组
     // 也就是所有适合的节点，将更方便
-    pub fn find(&self, size: usize, is_used: bool) -> Result<usize, &str> {
+    pub fn find(&self, size: usize, is_used: bool) -> Result<usize, TreeErr> {
         if size > MAX_SIZE {
-            return Err("BinTree::find");
+            return Err(TreeErr::WrongSize);
         }
 
         // 寻找并检验bit位为unused的节点
@@ -119,15 +126,15 @@ impl BinTree {
         }
 
         if idx == self.get_index(level + 1) {
-            Err("wrong")
+            Err(TreeErr::NotFound)
         } else {
             Ok(idx)
         }
     }
 
-    pub fn find_match(&self, size: usize, value: usize, is_used: bool) -> Result<usize, &str> {
+    pub fn find_match(&self, size: usize, value: usize, is_used: bool) -> Result<usize, TreeErr> {
         if size > MAX_SIZE {
-            return Err("BinTree::find");
+            return Err(TreeErr::WrongSize);
         }
 
         // 找到第一个适合的节点
@@ -143,7 +150,7 @@ impl BinTree {
             idx += 1;
         }
 
-        Err("wrong")
+        Err(TreeErr::NotFound)
     }
 
     // 获取树的最大节点数
@@ -313,7 +320,7 @@ pub mod tests {
         let gen_success = tree.init(0x10000, PGSZ * 10);
         let gen_error = bad_tree.init(0x10000, PGSZ / 2);
 
-        assert_eq!(Ok(8), gen_success);
+        assert!(gen_success.is_ok());
         assert!(gen_error.is_err());
 
         info!("{:x?}", tree);

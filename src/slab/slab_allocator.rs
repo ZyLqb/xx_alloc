@@ -26,7 +26,7 @@ impl SlabAllocator {
     pub const fn new() -> Self {
         Self {
             pool: [Linkedlist::new(); POOL_COUNT],
-            buddy: BuddyAllocator::new_new(),
+            buddy: BuddyAllocator::new(),
         }
     }
 
@@ -89,7 +89,7 @@ impl SlabAllocator {
             //     .expect("None Page");
             
             //TODO it should have error handle
-            let page = self.buddy.allocate(layout.size()).expect("None Page");
+            let page = self.buddy.allocate(layout).expect("None Page");
             
             let start = page;
             info!("it got a page {:#x}!", page);

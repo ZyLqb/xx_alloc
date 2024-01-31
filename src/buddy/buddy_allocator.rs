@@ -30,12 +30,6 @@ pub struct BuddyAllocator {
     page_counts: usize, // 剩余空闲页
 }
 
-pub enum AllocErr {
-    None,
-    NotEnough,
-    NotFind
-}
-
 #[allow(unused)]
 impl BuddyAllocator {
     pub const fn new() -> Self {
@@ -104,7 +98,7 @@ impl BuddyAllocator {
 
                 self.page_counts = counts - used;
             }
-            Err(err) => panic!("{}", err),
+            Err(err) => panic!("{:?}", err),
         }
     }
 

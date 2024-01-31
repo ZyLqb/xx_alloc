@@ -4,4 +4,4 @@ use crate::linklist::def::PGSZ;
 pub(crate) const PAGE_SIZE: usize = PGSZ;
 pub(crate) const MAX_PAGES: usize = MAX_LEAF;
 
-pub type MemPtr = usize;
+pub(crate) type MemPtr = usize;

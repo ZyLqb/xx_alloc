@@ -1,7 +1,7 @@
 use super::def::{MemPtr, MAX_PAGES, PAGE_SIZE};
 
 use crate::{align_down, align_up, bintree::tree::BinTree, is_align};
-use core::mem::size_of;
+use core::{mem::size_of, ptr::null_mut};
 
 /// 页内存分配器
 /// 用来分配连续的页内存，使用完全二叉树来管理
@@ -19,10 +19,22 @@ pub struct BuddyAllocator {
     page_counts: usize, // 剩余空闲页
 }
 
+pub enum AllocErr {
+    None,
+    NotEnough,
+    NotFind
+}
+
 #[allow(unused)]
 impl BuddyAllocator {
+    pub const fn new_new() -> Self {
+        Self {
+            zone: null_mut(),
+            page_counts: 0,
+        }
+    }
     pub const fn new(bottom: MemPtr, top: MemPtr) -> Self {
-        let start = align_up!(bottom, PAGE_SIZE);
+        let start: usize = align_up!(bottom, PAGE_SIZE);
         let end = align_down!(top, PAGE_SIZE);
         let mut zone = start as *mut BinTree;
         let mut page_counts = (end - start) / PAGE_SIZE + 1;
@@ -53,6 +65,34 @@ impl BuddyAllocator {
                 }
                 Err(err) => panic!("{}", err),
             }
+        }
+    } 
+    ///
+    /// # Safety
+    /// 
+    pub unsafe fn init_new(&mut self,bottom: MemPtr,top: MemPtr) {
+        let start: usize = align_up!(bottom, PAGE_SIZE);
+        let end = align_down!(top, PAGE_SIZE);
+        let mut zone = start as *mut BinTree;
+        let mut page_counts = (end - start) / PAGE_SIZE + 1;
+        
+        self.zone = zone;
+        self.page_counts = page_counts;
+        
+        match (*self.zone).init(self.zone as usize, PAGE_SIZE * self.page_counts) {
+            Ok(counts) => {
+                // 由于直接使用待管理内存的前几页保存该分配器
+                // 因此设置前三页为used
+                let used = align_up!(size_of::<BinTree>(), PAGE_SIZE) / PAGE_SIZE;
+                let index = (*self.zone).get_index((*self.zone).level);
+
+                for i in 0..used {
+                    (*self.zone).use_page(index + i);
+                }
+
+                self.page_counts = counts - used;
+            }
+            Err(err) => panic!("{}", err),
         }
     }
 
@@ -147,8 +187,8 @@ pub mod buddy_tests {
             bottom, top
         );
 
-        let mut buddy = BuddyAllocator::new(bottom, top);
-        buddy.init();
+        let mut buddy = BuddyAllocator::new_new();
+        unsafe { buddy.init_new(bottom, top) };
 
         assert_eq!(align_up!(bottom, MIN_SIZE), buddy.zone as usize);
 

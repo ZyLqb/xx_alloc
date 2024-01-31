@@ -100,7 +100,7 @@ impl BinTree {
         while idx < (self.get_index(level + 1) - 1) {
             if self.bitmap.is_empty(idx) != is_used {
                 let mut left_leaf = idx;
-                
+
                 while self.find_left_child(left_leaf) <= self.max_node() {
                     left_leaf = self.find_left_child(left_leaf);
                 }
@@ -232,7 +232,7 @@ pub mod tests {
     use crate::linklist::def::PGSZ;
     extern crate alloc;
     extern crate std;
-    use std::{panic, println};
+    use std::println;
     use xxos_log::{info, init_log, WriteLog};
     struct PT;
 

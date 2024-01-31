@@ -1,4 +1,4 @@
-use crate::{align_down, align_up};
+use crate::{align_down, align_up, is_align};
 
 use super::node::Node;
 use core::ptr::null_mut;
@@ -88,7 +88,7 @@ impl Linkedlist {
 
         info!("init ok the len is {}", self.len())
     }
-
+    //pop head
     pub unsafe fn pop<T>(&mut self) -> Option<*mut T> {
         if !self.head.is_null() {
             let head = self.head;
@@ -103,7 +103,28 @@ impl Linkedlist {
             None
         }
     }
-
+    //pop head
+    pub unsafe fn pop_algin<T>(&mut self, algin: usize) -> Option<*mut T> {
+        let tail_now = self.tail as usize;
+        let ptr = loop {
+            let Some(p) = self.pop() else {
+                break None;
+            };
+            if p as usize == tail_now && !is_align!(tail_now, algin) {
+                break None;
+            };
+            if is_align!(p as usize, algin) {
+                break Some(p);
+            } else {
+                self.push_tail(p as usize);
+            }
+        };
+        if self.is_empty() {
+            self.tail = null_mut();
+        }
+        ptr
+    }
+    //push head
     pub unsafe fn push(&mut self, address: usize) {
         let head = Node::to_mut_node_ptr(address);
         assert!(!head.is_null());
@@ -116,10 +137,10 @@ impl Linkedlist {
     pub unsafe fn push_tail(&mut self, address: usize) {
         let tail = self.tail;
         let new = Node::to_mut_node_ptr(address);
-        assert!(!tail.is_null());
-
+        assert!(!new.is_null());
         (*tail).next = new;
         (*new).next = null_mut();
+        self.tail = new;
     }
 }
 

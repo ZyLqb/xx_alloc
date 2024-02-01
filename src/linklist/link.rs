@@ -52,27 +52,21 @@ impl Linkedlist {
 
     pub fn len(&self) -> usize {
         let mut len = 0;
-
+        if self.is_empty() {
+            return 0;
+        }
         for _ in self.iter() {
             len += 1;
         }
-
         len
     }
 
     pub unsafe fn init(&mut self, start: usize, end: usize, chunk_size: usize) {
-        info!("start before align: {:#x}", start);
-        info!("end before align: {:#x}", end);
-
         let start = align_up!(start, chunk_size);
+        info!("the satrt is {:#x}",start);
         let end = align_down!(end, chunk_size);
-
-        info!("chunk size: {:#x}", chunk_size);
-        info!("start after align: {:#x}", start);
-        info!("end after align: {:#x}", end);
-
+        info!("the end is {:#x}",end);
         self.tail = Node::to_mut_node_ptr(start);
-
         for address in (start..end).step_by(chunk_size) {
             let head = Node::to_mut_node_ptr(address);
             if address + chunk_size == end {
@@ -83,9 +77,7 @@ impl Linkedlist {
                 (*head).next = next;
             }
         }
-
         self.head = Node::to_mut_node_ptr(start);
-
         info!("init ok the len is {}", self.len())
     }
     //pop head
@@ -128,9 +120,7 @@ impl Linkedlist {
     pub unsafe fn push(&mut self, address: usize) {
         let head = Node::to_mut_node_ptr(address);
         assert!(!head.is_null());
-
         (*head).next = self.head;
-
         self.head = head;
     }
 

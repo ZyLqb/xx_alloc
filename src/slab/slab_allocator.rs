@@ -1,13 +1,13 @@
 use crate::{
     align_up,
     buddy::def::PAGE_SIZE,
-    is_align,
     linklist::{def::*, link::Linkedlist},
     BuddyAllocator,
 };
 use core::{
     alloc::Layout,
-    ops::{Index, IndexMut}, ptr::null_mut,
+    ops::{Index, IndexMut},
+    ptr::null_mut,
 };
 use xxos_log::{error, info};
 
@@ -86,10 +86,10 @@ impl SlabAllocator {
 
             let end = start + PGSZ;
             info!("the end of the page is  {:#x}!", end);
-            assert_eq!(self.pool.index(index).len(),0);
+            assert_eq!(self.pool.index(index).len(), 0);
 
             self.pool.index_mut(index).init(start, end, layout.size());
-            
+
             if layout.align() > PAGE_SIZE {
                 error!("the algin is too big , plese give a samller algin");
                 return None;
@@ -107,23 +107,25 @@ impl SlabAllocator {
     pub unsafe fn allocate_fit(&mut self, layout: Layout) -> Result<*mut u8, ()> {
         info!("allocate start ");
         let layout = Self::align_layout(layout)?;
-        info!("get regular size ,{}",layout.size());
-        if layout.size() == 0 {return Ok(null_mut());}
+        info!("get regular size ,{}", layout.size());
+        if layout.size() == 0 {
+            return Ok(null_mut());
+        }
         let mut ptr = None;
-        let size_arr = [32,64,128,256,512,1024,2048,4096];
+        let size_arr = [32, 64, 128, 256, 512, 1024, 2048, 4096];
         let mut index = 0;
         for pool_size in size_arr {
             if layout.size() == pool_size {
-                info!("allocer in index {} the size is {}",index,layout.size());
+                info!("allocer in index {} the size is {}", index, layout.size());
                 ptr = self.allocate(index, layout);
                 break;
-            }else {
+            } else {
                 index += 1;
             }
-        };
+        }
 
-        if ptr.is_none(){
-            info!("the request size is more the pgsz , {}",layout.size());
+        if ptr.is_none() {
+            info!("the request size is more the pgsz , {}", layout.size());
             ptr = self.buddy.allocate(layout).ok().map(|x| x as *mut _);
         };
         //Todo it should have error handing
@@ -134,41 +136,24 @@ impl SlabAllocator {
         self.pool.index_mut(index).push(ptr as usize)
     }
 
-    pub fn is_aready_algin_for_pool(&self,layout: Layout) -> bool{
-        let size_arr = [32,64,128,256,512,1024,2048,4096];
-        let mut res = false;
-        for size in size_arr {
-            if layout.size() == size {
-                res = true;
-                break;
-            }
-        }
-        if layout.size() > PGSZ && is_align!(layout.size(),PGSZ) {
-            res = true
-        }
-        res
-    }
-
     pub unsafe fn deallocate_fit(&mut self, ptr: *mut u8, layout: Layout) {
-        if self.is_aready_algin_for_pool(layout) {
-            error!("the free size {} isn't a regular size ",layout.size());
-            panic!("err free")
-        }
-        let size_arr = [32,64,128,256,512,1024,2048,4096];
+        let layout = Self::align_layout(layout).expect("error");
+        let size_arr = [32, 64, 128, 256, 512, 1024, 2048, 4096];
         let mut index = 0;
         for size in size_arr {
-            if layout.size() == size{
+            if layout.size() == size {
                 self.deallocate(index, ptr);
             } else {
                 index += 1;
             }
         }
 
-        if layout.size() > PGSZ{
+        if layout.size() > PGSZ {
             //Todo it should have error handing
-            self.buddy.deallocate(ptr as usize, layout.size()).expect("error the buddy free error");
-            return;
+            self.buddy
+                .deallocate(ptr as usize, layout.size())
+                .expect("error the buddy free error");
         }
-        error!("in slab dealloc_fid not should run here")
+        //error!("in slab dealloc_fid not should run here")
     }
 }

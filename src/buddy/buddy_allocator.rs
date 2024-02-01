@@ -14,6 +14,16 @@ pub enum BuddyErr {
     WrongAddr,
 }
 
+impl From<TreeErr> for BuddyErr {
+    fn from(value: TreeErr) -> Self {
+        match value {
+            TreeErr::WrongSize => Self::WrongSize,
+            TreeErr::NotFound => Self::NotFound,
+            TreeErr::NotEnough => Self::NotEnough,
+        }
+    }
+}
+
 /// 页内存分配器
 /// 用来分配连续的页内存，使用完全二叉树来管理
 /// 因此管理的页数为2的幂
@@ -93,25 +103,18 @@ impl BuddyAllocator {
             // 剩余页面足够时，找到对应的unused节点并设置为used
             // 剩余页面减少
             unsafe {
-                match (*self.zone).find(mem_size, false) {
-                    Ok(index) => {
-                        let mut idx = index;
+                let mut idx = (*self.zone).find(mem_size, false)?;
+                let max_idx = (*self.zone).get_index((*self.zone).get_level(size));
 
-                        // 找到与layout对齐的地址
-                        addr = (*self.zone).get_value(idx);
-                        while !is_align!(addr, align_size) {
-                            idx += 1;
-                            addr = (*self.zone).get_value(idx);
-                        }
-
-                        (*self.zone).use_mem(idx);
-                        self.page_counts -= counts;
-                    }
-                    Err(TreeErr::NotEnough) => {
-                        return Err(BuddyErr::NotEnough);
-                    }
-                    Err(_) => {}
+                // 找到与layout对齐的地址
+                addr = (*self.zone).get_value(idx);
+                while idx < max_idx && !is_align!(addr, align_size) {
+                    idx += 1;
+                    addr = (*self.zone).get_value(idx);
                 }
+
+                (*self.zone).use_mem(idx);
+                self.page_counts -= counts;
             }
 
             Ok(addr)

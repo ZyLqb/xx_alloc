@@ -7,13 +7,16 @@ pub struct LockedSlab(Mutex<SlabAllocator>);
 unsafe impl Send for LockedSlab {}
 
 impl LockedSlab {
-    pub const fn new() -> Self {
-        let heap = SlabAllocator::new();
-        LockedSlab(Mutex::new(heap))
+    pub const fn new_uninit() -> Self {
+        LockedSlab(Mutex::new(SlabAllocator::new()))
     }
     pub fn init(&self, bottom: usize, top: usize) {
         unsafe { self.0.lock().init(bottom, top) };
     }
+
+    // pub fn allocate_fit(&self, layout: Layout){
+    //     self.0.lock().allocate_fit(layout).unwrap()
+    // }
 }
 
 unsafe impl GlobalAlloc for LockedSlab {

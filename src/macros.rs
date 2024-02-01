@@ -4,11 +4,10 @@ macro_rules! align {
         ($size & $mask)
     };
 }
-
 #[macro_export]
 macro_rules! is_align {
     ($size:expr, $align_size:expr) => {
-        ($size & ($align_size - 1)) == 0
+        ($size % $align_size) == 0
     };
 }
 
@@ -45,7 +44,6 @@ pub mod macro_test {
         assert_eq!(0x810, align_down!(0x818, 0x10));
         assert_eq!(0x820, align_up!(0x818, 0x10));
         assert_eq!(0x820, align_up!(0x820, 0x10));
-
         assert_eq!(0x7fc000, align_up!(0x7fb078, 0x2000));
         assert_eq!(0x7fa000, align_down!(0x7fb078, 0x2000));
     }

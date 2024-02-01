@@ -239,8 +239,7 @@ pub mod tests {
     use crate::linklist::def::PGSZ;
     extern crate alloc;
     extern crate std;
-    use std::{panic, println};
-    use xxos_log::LOG;
+    use std::println;
     use xxos_log::{info, init_log, WriteLog};
     struct PT;
 

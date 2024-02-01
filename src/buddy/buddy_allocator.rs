@@ -85,7 +85,8 @@ impl BuddyAllocator {
     }
 
     // 分配内存，需要提供待分配内存大小
-    pub fn allocate(&mut self, layout: Layout) -> Result<MemPtr, BuddyErr> {
+    /// # Safety
+    pub unsafe fn allocate(&mut self, layout: Layout) -> Result<MemPtr, BuddyErr> {
         let size = layout.size();
         let align_size = layout.align();
         let mem_size = align_up!(size, PAGE_SIZE);
@@ -102,27 +103,41 @@ impl BuddyAllocator {
 
             // 剩余页面足够时，找到对应的unused节点并设置为used
             // 剩余页面减少
-            unsafe {
-                let mut idx = (*self.zone).find(mem_size, false)?;
-                let max_idx = (*self.zone).get_index((*self.zone).get_level(size));
+            let mut idx = (*self.zone).find(mem_size, false)?;
+            let max_idx = (*self.zone).get_index((*self.zone).get_level(size));
 
-                // 找到与layout对齐的地址
+            // 找到与layout对齐的地址
+            addr = (*self.zone).get_value(idx);
+            while idx < max_idx && !is_align!(addr, align_size) {
+                idx += 1;
                 addr = (*self.zone).get_value(idx);
-                while idx < max_idx && !is_align!(addr, align_size) {
-                    idx += 1;
-                    addr = (*self.zone).get_value(idx);
-                }
-
-                (*self.zone).use_mem(idx);
-                self.page_counts -= counts;
             }
 
-            Ok(addr)
+            if idx != max_idx {
+                // 找到子树的最左节点
+                let mut left_leaf = idx;
+                let max_leaf = (*self.zone).max_node();
+                while (*self.zone).find_left_child(left_leaf) <= max_leaf {
+                    left_leaf = (*self.zone).find_left_child(left_leaf);
+                }
+
+                // 检查连续的页是否可用
+                if (*self.zone).can_use(left_leaf, counts) {
+                    (*self.zone).use_mem(idx);
+                    self.page_counts -= counts;
+                    Ok(addr)
+                } else {
+                    Err(BuddyErr::NotFound)
+                }
+            } else {
+                Err(BuddyErr::NotFound)
+            }
         }
     }
 
     // 释放内存，需要提供起始地址和内存大小
-    pub fn deallocate(&mut self, addr: MemPtr, size: usize) -> Result<usize, BuddyErr> {
+    /// # Safety
+    pub unsafe fn deallocate(&mut self, addr: MemPtr, size: usize) -> Result<usize, BuddyErr> {
         let counts = size / PAGE_SIZE;
 
         // 地址和大小需要对齐
@@ -130,19 +145,10 @@ impl BuddyAllocator {
             if is_align!(size, PAGE_SIZE) {
                 let mut idx = 0;
 
-                unsafe {
-                    // 找到对应节点并设置其为unused
-                    match (*self.zone).find_match(size, addr, true) {
-                        Ok(index) => {
-                            (*self.zone).unuse_mem(index);
-                            idx = index;
-                        }
-                        Err(TreeErr::NotFound) => {
-                            return Err(BuddyErr::NotEnough);
-                        }
-                        Err(_) => {}
-                    }
-                }
+                // 找到对应节点并设置其为unused
+                let index = (*self.zone).find_match(size, addr, true)?;
+                (*self.zone).unuse_mem(index);
+                idx = index;
 
                 Ok(idx)
             } else {

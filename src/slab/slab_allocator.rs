@@ -17,7 +17,7 @@ use xxos_log::{error, info, warn};
 /// 对应大小内存
 pub struct SlabAllocator {
     pub(crate) pool: [Linkedlist; POOL_COUNT],
-    pub(crate) buddy: BuddyAllocator
+    pub(crate) buddy: BuddyAllocator,
 }
 
 unsafe impl Send for SlabAllocator {}
@@ -87,10 +87,10 @@ impl SlabAllocator {
             //     .index_mut(POOL_PGSZ)
             //     .pop::<T>()
             //     .expect("None Page");
-            
+
             //TODO it should have error handle
             let page = self.buddy.allocate(layout).expect("None Page");
-            
+
             let start = page;
             info!("it got a page {:#x}!", page);
 

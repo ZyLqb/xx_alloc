@@ -8,12 +8,21 @@ use core::{alloc::Layout, mem::size_of, ptr::null_mut};
 
 #[derive(Debug)]
 pub enum BuddyErr {
+    None,
     NotEnough,
     NotFound,
     WrongSize,
     WrongAddr,
 }
-
+impl From<TreeErr> for BuddyErr {
+    fn from(value: TreeErr) -> Self {
+        match value {
+            TreeErr::NotEnough => Self::NotEnough,
+            TreeErr::WrongSize => Self::WrongSize,
+            TreeErr::NotFound => Self::NotFound,
+        }
+    }
+}
 /// 页内存分配器
 /// 用来分配连续的页内存，使用完全二叉树来管理
 /// 因此管理的页数为2的幂
@@ -72,19 +81,19 @@ impl BuddyAllocator {
                 panic!("");
             }
         }
-    } 
+    }
     ///
     /// # Safety
-    /// 
-    pub unsafe fn init_new(&mut self,bottom: MemPtr,top: MemPtr) {
+    ///
+    pub unsafe fn init_new(&mut self, bottom: MemPtr, top: MemPtr) {
         let start: usize = align_up!(bottom, PAGE_SIZE);
         let end = align_down!(top, PAGE_SIZE);
         let mut zone = start as *mut BinTree;
         let mut page_counts = (end - start) / PAGE_SIZE + 1;
-        
+
         self.zone = zone;
         self.page_counts = page_counts;
-        
+
         match (*self.zone).init(self.zone as usize, PAGE_SIZE * self.page_counts) {
             Ok(counts) => {
                 // 由于直接使用待管理内存的前几页保存该分配器
@@ -109,7 +118,7 @@ impl BuddyAllocator {
         let mem_size = align_up!(size, PAGE_SIZE);
 
         if self.page_counts == 0 {
-            Err(BuddyErr::NotEnough)
+            Err(BuddyErr::None)
         } else {
             let mut addr = 0;
             let counts = size / PAGE_SIZE;
@@ -121,25 +130,39 @@ impl BuddyAllocator {
             // 剩余页面足够时，找到对应的unused节点并设置为used
             // 剩余页面减少
             unsafe {
-                match (*self.zone).find(mem_size, false) {
-                    Ok(index) => {
-                        let mut idx = index;
+                // match (*self.zone).find(mem_size, false) {
+                //     Ok(index) => {
+                //         let mut idx = index;
 
-                        // 找到与layout对齐的地址
-                        addr = (*self.zone).get_value(idx);
-                        while !is_align!(addr, align_size) {
-                            idx += 1;
-                            addr = (*self.zone).get_value(idx);
-                        }
+                //         // 找到与layout对齐的地址
+                //         // bug
+                //         addr = (*self.zone).get_value(idx);
+                //         while !is_align!(addr, align_size) {
+                //             idx += 1;
+                //             addr = (*self.zone).get_value(idx);
+                //         }
 
-                        (*self.zone).use_mem(idx);
-                        self.page_counts -= counts;
-                    }
-                    Err(TreeErr::NotEnough) => {
-                        return Err(BuddyErr::NotEnough);
-                    }
-                    Err(_) => {}
+                //         (*self.zone).use_mem(idx);
+                //         self.page_counts -= counts;
+                //     }
+                //     Err(TreeErr::NotEnough) => {
+                //         return Err(BuddyErr::NotEnough);
+                //     }
+                //     Err(_) => {}
+                // }
+                let index = (*self.zone).find(mem_size, false)?;
+                let mut idx = index;
+
+                // 找到与layout对齐的地址
+                // bug
+                addr = (*self.zone).get_value(idx);
+                while !is_align!(addr, align_size) {
+                    idx += 1;
+                    addr = (*self.zone).get_value(idx);
                 }
+
+                (*self.zone).use_mem(idx);
+                self.page_counts -= counts;
             }
 
             Ok(addr)

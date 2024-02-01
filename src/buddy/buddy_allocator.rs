@@ -206,7 +206,8 @@ pub mod buddy_tests {
             PAGE_SIZE,
             PAGE_SIZE << 1
         );
-        let mut addr1 = buddy.allocate(Layout::from_size_align(PAGE_SIZE, PAGE_SIZE << 1).unwrap());
+        let mut addr1 =
+            unsafe { buddy.allocate(Layout::from_size_align(PAGE_SIZE, PAGE_SIZE << 1).unwrap()) };
         match addr1 {
             Ok(addr) => {
                 info!("allocate addr1: {:#x}", addr);
@@ -227,7 +228,8 @@ pub mod buddy_tests {
             PAGE_SIZE << 1,
             PAGE_SIZE
         );
-        let mut addr2 = buddy.allocate(Layout::from_size_align(PAGE_SIZE << 1, PAGE_SIZE).unwrap());
+        let mut addr2 =
+            unsafe { buddy.allocate(Layout::from_size_align(PAGE_SIZE << 1, PAGE_SIZE).unwrap()) };
         match addr2 {
             Ok(addr) => {
                 info!("allocate addr2: {:#x}", addr);
@@ -242,7 +244,8 @@ pub mod buddy_tests {
             "BuddyAllocator::allocate({:#x}, align_size: {:#x})",
             PAGE_SIZE, PAGE_SIZE
         );
-        let addr3 = buddy.allocate(Layout::from_size_align(PAGE_SIZE, PAGE_SIZE).unwrap());
+        let addr3 =
+            unsafe { buddy.allocate(Layout::from_size_align(PAGE_SIZE, PAGE_SIZE).unwrap()) };
         match addr3 {
             Ok(addr) => {
                 info!("allocate addr3: {:#x}", addr);
@@ -254,13 +257,13 @@ pub mod buddy_tests {
         }
 
         info!("BuddyAllocator::deallocate({:#x})", addr1.as_ref().unwrap());
-        let free1 = buddy.deallocate(addr1.unwrap(), PAGE_SIZE).unwrap();
+        let free1 = unsafe { buddy.deallocate(addr1.unwrap(), PAGE_SIZE) }.unwrap();
         assert_eq!(18, free1);
         info!("BuddyAllocator::deallocate({:#x})", addr2.as_ref().unwrap());
-        let free2 = buddy.deallocate(addr2.unwrap(), PAGE_SIZE << 1).unwrap();
+        let free2 = unsafe { buddy.deallocate(addr2.unwrap(), PAGE_SIZE << 1) }.unwrap();
         assert_eq!(9, free2);
 
-        addr1 = buddy.allocate(Layout::from_size_align(PAGE_SIZE, PAGE_SIZE).unwrap());
+        addr1 = unsafe { buddy.allocate(Layout::from_size_align(PAGE_SIZE, PAGE_SIZE).unwrap()) };
         match addr1 {
             Ok(addr) => {
                 info!("allocate addr: {:#x}", addr);
@@ -271,7 +274,8 @@ pub mod buddy_tests {
             }
         }
 
-        addr2 = buddy.allocate(Layout::from_size_align(PAGE_SIZE << 1, PAGE_SIZE).unwrap());
+        addr2 =
+            unsafe { buddy.allocate(Layout::from_size_align(PAGE_SIZE << 1, PAGE_SIZE).unwrap()) };
         match addr2 {
             Ok(addr) => {
                 info!("allocate addr: {:#x}", addr);

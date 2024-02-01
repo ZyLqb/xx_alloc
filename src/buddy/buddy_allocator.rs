@@ -14,15 +14,17 @@ pub enum BuddyErr {
     WrongSize,
     WrongAddr,
 }
+
 impl From<TreeErr> for BuddyErr {
     fn from(value: TreeErr) -> Self {
         match value {
-            TreeErr::NotEnough => Self::NotEnough,
             TreeErr::WrongSize => Self::WrongSize,
             TreeErr::NotFound => Self::NotFound,
+            TreeErr::NotEnough => Self::NotEnough,
         }
     }
 }
+
 /// 页内存分配器
 /// 用来分配连续的页内存，使用完全二叉树来管理
 /// 因此管理的页数为2的幂
@@ -112,7 +114,8 @@ impl BuddyAllocator {
     }
 
     // 分配内存，需要提供待分配内存大小
-    pub fn allocate(&mut self, layout: Layout) -> Result<MemPtr, BuddyErr> {
+    /// # Safety
+    pub unsafe fn allocate(&mut self, layout: Layout) -> Result<MemPtr, BuddyErr> {
         let size = layout.size();
         let align_size = layout.align();
         let mem_size = align_up!(size, PAGE_SIZE);
@@ -129,48 +132,41 @@ impl BuddyAllocator {
 
             // 剩余页面足够时，找到对应的unused节点并设置为used
             // 剩余页面减少
-            unsafe {
-                // match (*self.zone).find(mem_size, false) {
-                //     Ok(index) => {
-                //         let mut idx = index;
+            let mut idx = (*self.zone).find(mem_size, false)?;
+            let max_idx = (*self.zone).get_index((*self.zone).get_level(size));
 
-                //         // 找到与layout对齐的地址
-                //         // bug
-                //         addr = (*self.zone).get_value(idx);
-                //         while !is_align!(addr, align_size) {
-                //             idx += 1;
-                //             addr = (*self.zone).get_value(idx);
-                //         }
-
-                //         (*self.zone).use_mem(idx);
-                //         self.page_counts -= counts;
-                //     }
-                //     Err(TreeErr::NotEnough) => {
-                //         return Err(BuddyErr::NotEnough);
-                //     }
-                //     Err(_) => {}
-                // }
-                let index = (*self.zone).find(mem_size, false)?;
-                let mut idx = index;
-
-                // 找到与layout对齐的地址
-                // bug
+            // 找到与layout对齐的地址
+            addr = (*self.zone).get_value(idx);
+            while idx < max_idx && !is_align!(addr, align_size) {
+                idx += 1;
                 addr = (*self.zone).get_value(idx);
-                while !is_align!(addr, align_size) {
-                    idx += 1;
-                    addr = (*self.zone).get_value(idx);
-                }
-
-                (*self.zone).use_mem(idx);
-                self.page_counts -= counts;
             }
 
-            Ok(addr)
+            if idx != max_idx {
+                // 找到子树的最左节点
+                let mut left_leaf = idx;
+                let max_leaf = (*self.zone).max_node();
+                while (*self.zone).find_left_child(left_leaf) <= max_leaf {
+                    left_leaf = (*self.zone).find_left_child(left_leaf);
+                }
+
+                // 检查连续的页是否可用
+                if (*self.zone).can_use(left_leaf, counts) {
+                    (*self.zone).use_mem(idx);
+                    self.page_counts -= counts;
+                    Ok(addr)
+                } else {
+                    Err(BuddyErr::NotFound)
+                }
+            } else {
+                Err(BuddyErr::NotFound)
+            }
         }
     }
 
     // 释放内存，需要提供起始地址和内存大小
-    pub fn deallocate(&mut self, addr: MemPtr, size: usize) -> Result<usize, BuddyErr> {
+    /// # Safety
+    pub unsafe fn deallocate(&mut self, addr: MemPtr, size: usize) -> Result<usize, BuddyErr> {
         let counts = size / PAGE_SIZE;
 
         // 地址和大小需要对齐
@@ -178,19 +174,10 @@ impl BuddyAllocator {
             if is_align!(size, PAGE_SIZE) {
                 let mut idx = 0;
 
-                unsafe {
-                    // 找到对应节点并设置其为unused
-                    match (*self.zone).find_match(size, addr, true) {
-                        Ok(index) => {
-                            (*self.zone).unuse_mem(index);
-                            idx = index;
-                        }
-                        Err(TreeErr::NotFound) => {
-                            return Err(BuddyErr::NotEnough);
-                        }
-                        Err(_) => {}
-                    }
-                }
+                // 找到对应节点并设置其为unused
+                let index = (*self.zone).find_match(size, addr, true)?;
+                (*self.zone).unuse_mem(index);
+                idx = index;
 
                 Ok(idx)
             } else {
@@ -247,7 +234,8 @@ pub mod buddy_tests {
             PAGE_SIZE,
             PAGE_SIZE << 1
         );
-        let mut addr1 = buddy.allocate(Layout::from_size_align(PAGE_SIZE, PAGE_SIZE << 1).unwrap());
+        let mut addr1 =
+            unsafe { buddy.allocate(Layout::from_size_align(PAGE_SIZE, PAGE_SIZE << 1).unwrap()) };
         match addr1 {
             Ok(addr) => {
                 info!("allocate addr1: {:#x}", addr);
@@ -268,7 +256,8 @@ pub mod buddy_tests {
             PAGE_SIZE << 1,
             PAGE_SIZE
         );
-        let mut addr2 = buddy.allocate(Layout::from_size_align(PAGE_SIZE << 1, PAGE_SIZE).unwrap());
+        let mut addr2 =
+            unsafe { buddy.allocate(Layout::from_size_align(PAGE_SIZE << 1, PAGE_SIZE).unwrap()) };
         match addr2 {
             Ok(addr) => {
                 info!("allocate addr2: {:#x}", addr);
@@ -283,7 +272,8 @@ pub mod buddy_tests {
             "BuddyAllocator::allocate({:#x}, align_size: {:#x})",
             PAGE_SIZE, PAGE_SIZE
         );
-        let addr3 = buddy.allocate(Layout::from_size_align(PAGE_SIZE, PAGE_SIZE).unwrap());
+        let addr3 =
+            unsafe { buddy.allocate(Layout::from_size_align(PAGE_SIZE, PAGE_SIZE).unwrap()) };
         match addr3 {
             Ok(addr) => {
                 info!("allocate addr3: {:#x}", addr);
@@ -295,13 +285,13 @@ pub mod buddy_tests {
         }
 
         info!("BuddyAllocator::deallocate({:#x})", addr1.as_ref().unwrap());
-        let free1 = buddy.deallocate(addr1.unwrap(), PAGE_SIZE).unwrap();
+        let free1 = unsafe { buddy.deallocate(addr1.unwrap(), PAGE_SIZE) }.unwrap();
         assert_eq!(18, free1);
         info!("BuddyAllocator::deallocate({:#x})", addr2.as_ref().unwrap());
-        let free2 = buddy.deallocate(addr2.unwrap(), PAGE_SIZE << 1).unwrap();
+        let free2 = unsafe { buddy.deallocate(addr2.unwrap(), PAGE_SIZE << 1) }.unwrap();
         assert_eq!(9, free2);
 
-        addr1 = buddy.allocate(Layout::from_size_align(PAGE_SIZE, PAGE_SIZE).unwrap());
+        addr1 = unsafe { buddy.allocate(Layout::from_size_align(PAGE_SIZE, PAGE_SIZE).unwrap()) };
         match addr1 {
             Ok(addr) => {
                 info!("allocate addr: {:#x}", addr);
@@ -312,7 +302,8 @@ pub mod buddy_tests {
             }
         }
 
-        addr2 = buddy.allocate(Layout::from_size_align(PAGE_SIZE << 1, PAGE_SIZE).unwrap());
+        addr2 =
+            unsafe { buddy.allocate(Layout::from_size_align(PAGE_SIZE << 1, PAGE_SIZE).unwrap()) };
         match addr2 {
             Ok(addr) => {
                 info!("allocate addr: {:#x}", addr);

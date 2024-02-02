@@ -195,9 +195,8 @@ pub mod buddy_tests {
     fn buddy_test() {
         init_log(&PT, xxos_log::Level::INFO);
 
-        const PAGE_COUNTS: usize = 1 << 8;
-        let test_mem: [usize; PAGE_SIZE * (PAGE_COUNTS + 1) / 8] =
-            [0; (PAGE_SIZE * (PAGE_COUNTS + 1) / 8)];
+        const PAGE_COUNTS: usize = (1 << 8) - 5;
+        let test_mem: [usize; PAGE_SIZE * PAGE_COUNTS / 8] = [0; (PAGE_SIZE * PAGE_COUNTS / 8)];
         info!(
             "test_mem_size: {:#x} Bytes, {} pages.",
             test_mem.len() * 8,
@@ -205,7 +204,7 @@ pub mod buddy_tests {
         );
 
         let bottom = &test_mem[0] as *const _ as usize;
-        let top = &test_mem[PAGE_SIZE * (PAGE_COUNTS + 1) / 8 - 1] as *const _ as usize;
+        let top = &test_mem[PAGE_SIZE * PAGE_COUNTS / 8 - 1] as *const _ as usize;
 
         info!(
             "BuddyAllocator::new(bottom: {:#x}, top: {:#x})",

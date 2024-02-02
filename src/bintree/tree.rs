@@ -236,7 +236,7 @@ impl BinTree {
 #[cfg(test)]
 pub mod tests {
     use super::BinTree;
-    use crate::linklist::def::PGSZ;
+    use crate::def::PGSZ;
     extern crate alloc;
     extern crate std;
     use std::println;

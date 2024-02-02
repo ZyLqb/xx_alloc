@@ -5,6 +5,7 @@
 #![feature(exclusive_range_pattern)]
 mod bintree;
 mod buddy;
+mod def;
 mod linklist;
 mod macros;
 mod slab;
@@ -19,7 +20,7 @@ mod tests {
     use std::println;
     use xxos_log::WriteLog;
     extern crate std;
-    use crate::{slab::slab_lock::LockedSlab, linklist::def::PGSZ};
+    use crate::{def::PGSZ, slab::slab_lock::LockedSlab};
     struct PT;
     impl WriteLog for PT {
         fn print(&self, log_content: core::fmt::Arguments) {
@@ -36,11 +37,11 @@ mod tests {
             heap.init(bottom, top);
             let mut now = 0;
             for i in 0..10 {
-                let last = now; 
+                let last = now;
                 let layout = Layout::from_size_align(290, 8).unwrap();
                 now = heap.alloc(layout) as usize;
-                if i != 0{
-                    assert_eq!(last+512,now);
+                if i != 0 {
+                    assert_eq!(last + 512, now);
                 }
             }
         }
@@ -56,14 +57,13 @@ mod tests {
             heap.init(bottom, top);
             let mut now = 0;
             for i in 0..10 {
-                let last = now; 
+                let last = now;
                 let layout = Layout::from_size_align(290, 8).unwrap();
                 now = heap.alloc(layout) as usize;
                 heap.dealloc(now as *mut _, layout);
-                if i != 0{
-                    assert_eq!(last,now);
+                if i != 0 {
+                    assert_eq!(last, now);
                 }
-
             }
         }
     }
@@ -78,11 +78,11 @@ mod tests {
             heap.init(bottom, top);
             let mut now = 0;
             for i in 0..3 {
-                let last = now; 
-                let layout = Layout::from_size_align(PGSZ *2 , 8).unwrap();
+                let last = now;
+                let layout = Layout::from_size_align(PGSZ * 2, 8).unwrap();
                 now = heap.alloc(layout) as usize;
-                if i != 0{
-                    assert_eq!(last+PGSZ*2,now);
+                if i != 0 {
+                    assert_eq!(last + PGSZ * 2, now);
                 }
             }
         }
@@ -98,12 +98,12 @@ mod tests {
             heap.init(bottom, top);
             let mut now = 0;
             for i in 0..3 {
-                let last = now; 
-                let layout = Layout::from_size_align(PGSZ *2 , 8).unwrap();
+                let last = now;
+                let layout = Layout::from_size_align(PGSZ * 2, 8).unwrap();
                 now = heap.alloc(layout) as usize;
                 heap.dealloc(now as *mut _, layout);
-                if i != 0{
-                    assert_eq!(last,now);
+                if i != 0 {
+                    assert_eq!(last, now);
                 }
             }
         }

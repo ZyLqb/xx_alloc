@@ -1,5 +1,3 @@
-pub(crate) const PGSZ: usize = 4096;
-
 // pub(crate) const POOL_4096: usize = 0;
 // pub(crate) const POOL_2048: usize = 1;
 // pub(crate) const POOL_1024: usize = 2;

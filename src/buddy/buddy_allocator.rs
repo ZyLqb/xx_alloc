@@ -30,9 +30,15 @@ impl From<TreeErr> for BuddyErr {
 /// 因此管理的页数为2的幂
 /// Example:
 /// ```
-/// let mut buddy = BuddyAllocator::new(bottom, top);
-/// let mut addr1 = buddy.allocate(Layout::from_size_align(PAGE_SIZE, PAGE_SIZE).unwrap());
-/// let mut addr2 = buddy.allocate(Layout::from_size_align(PAGE_SIZE << 1, PAGE_SIZE).unwrap());
+/// const PAGE_COUNTS: usize = 16;
+///
+/// let test_mem: [usize; PAGE_SIZE * (PAGE_COUNTS + 1) / 8] = [0; (PAGE_SIZE * (PAGE_COUNTS + 1) / 8)];
+/// let mut buddy = BuddyAllocator::new();
+/// unsafe { buddy.init(bottom, top) };
+/// let bottom = &test_mem[0] as *const _ as usize;
+/// let top = &test_mem[PAGE_SIZE * (PAGE_COUNTS + 1) / 8 - 1] as *const _ as usize;
+/// let mut addr1 = unsafe { buddy.allocate(Layout::from_size_align(PAGE_SIZE, PAGE_SIZE).unwrap()) };
+/// let mut addr2 = unsafe { buddy.allocate(Layout::from_size_align(PAGE_SIZE << 1, PAGE_SIZE).unwrap()) };
 /// let _ = buddy.deallocate(addr1.unwrap(), PAGE_SIZE);
 /// ```
 #[derive(Debug)]
@@ -57,10 +63,15 @@ impl BuddyAllocator {
         let start = align_up!(bottom, PAGE_SIZE);
         let end = align_down!(top, PAGE_SIZE);
         let mut zone = start as *mut BinTree;
-        let mut page_counts = (end - start) / PAGE_SIZE + 1;
+        let mut page_counts = (end - start) / PAGE_SIZE;
 
         if page_counts > MAX_PAGES {
-            panic!("size too big.");
+            panic!("size is too big.");
+        } else if page_counts < size_of::<BinTree>() / PAGE_SIZE {
+            panic!(
+                "size is too small, at least {} pages.",
+                size_of::<BinTree>() / PAGE_SIZE
+            );
         }
 
         self.zone = start as *mut BinTree;
@@ -68,8 +79,7 @@ impl BuddyAllocator {
 
         match (*self.zone).init(self.zone as usize, PAGE_SIZE * self.page_counts) {
             Ok(counts) => {
-                // 由于直接使用待管理内存的前几页保存该分配器
-                // 因此设置前三页为used
+                // 直接使用待管理内存的前几页保存该分配器，因此设置为used
                 let used = align_up!(size_of::<BinTree>(), PAGE_SIZE) / PAGE_SIZE;
                 let index = (*self.zone).get_index((*self.zone).level);
 
@@ -82,34 +92,6 @@ impl BuddyAllocator {
             Err(_) => {
                 panic!("");
             }
-        }
-    }
-    ///
-    /// # Safety
-    ///
-    pub unsafe fn init_new(&mut self, bottom: MemPtr, top: MemPtr) {
-        let start: usize = align_up!(bottom, PAGE_SIZE);
-        let end = align_down!(top, PAGE_SIZE);
-        let mut zone = start as *mut BinTree;
-        let mut page_counts = (end - start) / PAGE_SIZE + 1;
-
-        self.zone = zone;
-        self.page_counts = page_counts;
-
-        match (*self.zone).init(self.zone as usize, PAGE_SIZE * self.page_counts) {
-            Ok(counts) => {
-                // 由于直接使用待管理内存的前几页保存该分配器
-                // 因此设置前三页为used
-                let used = align_up!(size_of::<BinTree>(), PAGE_SIZE) / PAGE_SIZE;
-                let index = (*self.zone).get_index((*self.zone).level);
-
-                for i in 0..used {
-                    (*self.zone).use_page(index + i);
-                }
-
-                self.page_counts = counts - used;
-            }
-            Err(err) => panic!("{:?}", err),
         }
     }
 
@@ -194,12 +176,13 @@ impl BuddyAllocator {
 pub mod buddy_tests {
     extern crate std;
     use super::BuddyAllocator;
-    use crate::align_up;
     use crate::bintree::def::MIN_SIZE;
     use crate::buddy::def::PAGE_SIZE;
+    use crate::def::PGSZ;
+    use crate::{align_up, is_align};
     use core::alloc::Layout;
     use std::{panic, println};
-    use xxos_log::{info, init_log, WriteLog};
+    use xxos_log::{info, init_log, warn, WriteLog};
     struct PT;
 
     impl WriteLog for PT {
@@ -210,13 +193,19 @@ pub mod buddy_tests {
 
     #[test]
     fn buddy_test() {
+        init_log(&PT, xxos_log::Level::INFO);
 
-        const PAGE_COUNTS: usize = 16;
-        let test_mem: [usize; PAGE_SIZE * PAGE_COUNTS / 8] = [0; PAGE_SIZE * PAGE_COUNTS / 8];
-        info!("test_mem_size: {:x} Bytes", PAGE_COUNTS * PAGE_SIZE);
+        const PAGE_COUNTS: usize = 1 << 8;
+        let test_mem: [usize; PAGE_SIZE * (PAGE_COUNTS + 1) / 8] =
+            [0; (PAGE_SIZE * (PAGE_COUNTS + 1) / 8)];
+        info!(
+            "test_mem_size: {:#x} Bytes, {} pages.",
+            test_mem.len() * 8,
+            test_mem.len() * 8 / PGSZ
+        );
 
-        let bottom = test_mem.as_ptr() as usize;
-        let top = bottom + PAGE_COUNTS * PAGE_SIZE;
+        let bottom = &test_mem[0] as *const _ as usize;
+        let top = &test_mem[PAGE_SIZE * (PAGE_COUNTS + 1) / 8 - 1] as *const _ as usize;
 
         info!(
             "BuddyAllocator::new(bottom: {:#x}, top: {:#x})",
@@ -226,6 +215,12 @@ pub mod buddy_tests {
         let mut buddy = BuddyAllocator::new();
         unsafe { buddy.init(bottom, top) };
 
+        info!(
+            "start: {:#x} end: {:#x} free pages: {}",
+            buddy.zone as usize,
+            buddy.zone as usize + buddy.page_counts * PGSZ,
+            buddy.page_counts
+        );
         assert_eq!(align_up!(bottom, MIN_SIZE), buddy.zone as usize);
 
         info!(
@@ -235,20 +230,20 @@ pub mod buddy_tests {
         );
         let mut addr1 =
             unsafe { buddy.allocate(Layout::from_size_align(PAGE_SIZE, PAGE_SIZE << 1).unwrap()) };
-        // match addr1 {
-        //     Ok(addr) => {
-        //         info!("allocate addr1: {:#x}", addr);
-        //         assert_eq!(
-        //             align_up!(bottom + 3 * PAGE_SIZE, PAGE_SIZE),
-        //             addr,
-        //             "\nThis result has related to the root address, example my root address is {:#x} so my first allocate aligned {:#x} address is page no.4(root + 3 * PGSZ = {:#x})",
-        //             buddy.zone as usize,PAGE_SIZE<<1,align_up!(bottom+3*PAGE_SIZE,PAGE_SIZE)
-        //         );
-        //     }
-        //     Err(_) => {
-        //         panic!("")
-        //     }
-        // }
+        match addr1 {
+            Ok(addr) => {
+                info!("allocate addr1: {:#x}", addr);
+                assert_eq!(
+                     align_up!(bottom + 144 * PAGE_SIZE, PAGE_SIZE),
+                     addr,
+                     "\nThis result has related to the root address, example my root address is {:#x} so my first allocate aligned {:#x} address is page no.145(root + 144 * PGSZ = {:#x})",
+                     buddy.zone as usize,PAGE_SIZE<<1,align_up!(bottom+144*PAGE_SIZE,PAGE_SIZE)
+                 );
+            }
+            Err(_) => {
+                panic!("")
+            }
+        }
 
         info!(
             "BuddyAllocator::allocate({:#x}, align_size: {:#x})",
@@ -260,7 +255,7 @@ pub mod buddy_tests {
         match addr2 {
             Ok(addr) => {
                 info!("allocate addr2: {:#x}", addr);
-                //assert_eq!(align_up!(bottom + 4 * PAGE_SIZE, PAGE_SIZE), addr);
+                assert_eq!(align_up!(bottom + 146 * PAGE_SIZE, PAGE_SIZE), addr);
             }
             Err(_) => {
                 panic!("");
@@ -276,7 +271,7 @@ pub mod buddy_tests {
         match addr3 {
             Ok(addr) => {
                 info!("allocate addr3: {:#x}", addr);
-                //assert_eq!(align_up!(bottom + 6 * PAGE_SIZE, PAGE_SIZE), addr,);
+                assert_eq!(align_up!(bottom + 145 * PAGE_SIZE, PAGE_SIZE), addr,);
             }
             Err(_) => {
                 panic!("");
@@ -285,16 +280,16 @@ pub mod buddy_tests {
 
         info!("BuddyAllocator::deallocate({:#x})", addr1.as_ref().unwrap());
         let free1 = unsafe { buddy.deallocate(addr1.unwrap(), PAGE_SIZE) }.unwrap();
-        //assert_eq!(18, free1);
+        assert_eq!(399, free1);
         info!("BuddyAllocator::deallocate({:#x})", addr2.as_ref().unwrap());
         let free2 = unsafe { buddy.deallocate(addr2.unwrap(), PAGE_SIZE << 1) }.unwrap();
-        //assert_eq!(9, free2);
+        assert_eq!(200, free2);
 
         addr1 = unsafe { buddy.allocate(Layout::from_size_align(PAGE_SIZE, PAGE_SIZE).unwrap()) };
         match addr1 {
             Ok(addr) => {
                 info!("allocate addr: {:#x}", addr);
-                //assert_eq!(align_up!(bottom + 3 * PAGE_SIZE, PAGE_SIZE), addr);
+                assert_eq!(align_up!(bottom + 144 * PAGE_SIZE, PAGE_SIZE), addr);
             }
             Err(_) => {
                 panic!("");
@@ -306,7 +301,7 @@ pub mod buddy_tests {
         match addr2 {
             Ok(addr) => {
                 info!("allocate addr: {:#x}", addr);
-                //assert_eq!(align_up!(bottom + 4 * PAGE_SIZE, PAGE_SIZE), addr);
+                assert_eq!(align_up!(bottom + 146 * PAGE_SIZE, PAGE_SIZE), addr);
             }
             Err(_) => {
                 panic!("");

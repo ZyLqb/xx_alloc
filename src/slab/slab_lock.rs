@@ -21,7 +21,7 @@ impl LockedSlab {
 
 unsafe impl GlobalAlloc for LockedSlab {
     unsafe fn alloc(&self, layout: Layout) -> *mut u8 {
-        self.0.lock().allocate_fit(layout).unwrap()
+        self.0.lock().allocate_fit(layout).expect("alloc err")
     }
     unsafe fn dealloc(&self, ptr: *mut u8, layout: Layout) {
         self.0.lock().deallocate_fit(ptr, layout)

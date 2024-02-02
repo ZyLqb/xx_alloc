@@ -76,8 +76,6 @@ impl BinTree {
             }
         }
 
-        leaf_counts = tmp_leaf;
-
         Ok(leaf_counts)
     }
 

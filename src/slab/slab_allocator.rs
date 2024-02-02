@@ -57,7 +57,7 @@ impl SlabAllocator {
         );
 
         let fit_size = find_fit_size(layout.size());
-        let algin = get_algin(layout.align(), fit_size);
+        let algin = get_algin(layout.align(), PGSZ);
 
         info!("the layout is size {:#x} algin {:#x}", fit_size, algin);
         Layout::from_size_align(fit_size, algin).map_err(|_| ())

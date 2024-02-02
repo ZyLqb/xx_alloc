@@ -1,5 +1,5 @@
 use super::{def::*, treemap::TreeMap};
-use crate::align_down;
+use crate::{align_down, buddy::def::PAGE_SIZE};
 
 #[derive(Debug)]
 pub enum TreeErr {
@@ -31,29 +31,31 @@ impl BinTree {
     pub fn init(&mut self, root: usize, size: usize) -> Result<usize, TreeErr> {
         let mut mem_size = align_down!(size, MIN_SIZE);
         let mut leaf_counts = mem_size / MIN_SIZE;
-
-        // 只能管理2的幂个数的页
-        while leaf_counts > 0 && !leaf_counts.is_power_of_two() {
-            leaf_counts -= 1;
-            mem_size -= MIN_SIZE;
-        }
+        let mut tmp_leaf = leaf_counts;
+        let mut tmp_size = mem_size;
 
         if leaf_counts == 0 {
             return Err(TreeErr::NotEnough);
         }
 
+        // 向上找到最大节点数
+        while !tmp_leaf.is_power_of_two() {
+            tmp_leaf += 1;
+            tmp_size += PAGE_SIZE;
+        }
+
         // 先将所有页的bit位设置为1(used)
         self.bitmap.set_bit_all();
 
-        let node_counts = leaf_counts * 2 - 1;
-        let mut cur_size = mem_size;
+        let node_counts = tmp_leaf * 2 - 1;
+        let mut cur_size = tmp_size;
         let mut counts = 0;
 
         // 将页地址放入二叉树中，每放入一个则设置其bit位为0(unused)
         while counts < node_counts {
             let mut current = root;
 
-            while current < (root + mem_size) {
+            while current < (root + tmp_size) {
                 self.nodes[counts] = current;
                 self.bitmap.unset_bit(counts);
 
@@ -64,6 +66,17 @@ impl BinTree {
             cur_size >>= 1;
             self.level += 1;
         }
+
+        // 将不可用的地址设为used
+        if tmp_leaf > leaf_counts {
+            let level = self.get_level(PAGE_SIZE);
+            let idx = self.get_index(level);
+            for i in (idx + leaf_counts)..(idx + tmp_leaf) {
+                self.bitmap.set_bit(i);
+            }
+        }
+
+        leaf_counts = tmp_leaf;
 
         Ok(leaf_counts)
     }
@@ -236,7 +249,7 @@ impl BinTree {
 #[cfg(test)]
 pub mod tests {
     use super::BinTree;
-    use crate::linklist::def::PGSZ;
+    use crate::def::PGSZ;
     extern crate alloc;
     extern crate std;
     use std::println;

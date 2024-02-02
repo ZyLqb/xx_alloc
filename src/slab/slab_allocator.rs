@@ -1,6 +1,6 @@
+use crate::def::PGSZ;
 use crate::{
     align_up,
-    buddy::def::PAGE_SIZE,
     linklist::{def::*, link::Linkedlist},
     BuddyAllocator,
 };
@@ -90,7 +90,7 @@ impl SlabAllocator {
 
             self.pool.index_mut(index).init(start, end, layout.size());
 
-            if layout.align() > PAGE_SIZE {
+            if layout.align() > PGSZ {
                 error!("the algin is too big , plese give a samller algin");
                 return None;
             }

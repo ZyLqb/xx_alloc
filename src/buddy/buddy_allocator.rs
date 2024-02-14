@@ -73,9 +73,9 @@ impl BuddyAllocator {
         );
 
         if page_counts > MAX_PAGES {
-            error!("size is too big.");
+            panic!("size is too big.");
         } else if page_counts < size_of::<BinTree>() / PAGE_SIZE {
-            error!(
+            panic!(
                 "size is too small, at least {} pages.",
                 size_of::<BinTree>() / PAGE_SIZE
             );
@@ -108,7 +108,7 @@ impl BuddyAllocator {
                 );
             }
             Err(_) => {
-                error!("buddy initialize failure");
+                panic!("buddy initialize failure");
             }
         }
     }

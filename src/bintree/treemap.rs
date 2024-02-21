@@ -1,3 +1,5 @@
+use core::mem::size_of;
+
 use super::def::MAX_NODES;
 
 // 二叉树的位图
@@ -19,24 +21,24 @@ impl TreeMap {
 
     // 获取对应bit位
     pub fn is_empty(&self, idx: usize) -> bool {
-        let byte_index = idx / 8;
-        let bit_index = idx % 8;
+        let byte_index = idx / size_of::<usize>();
+        let bit_index = idx % size_of::<usize>();
 
         (self.0[byte_index] & (1 << bit_index)) == 0
     }
 
     // 设置对应bit位为1
     pub fn set_bit(&mut self, idx: usize) {
-        let byte_index = idx / 8;
-        let bit_index = idx % 8;
+        let byte_index = idx / size_of::<usize>();
+        let bit_index = idx % size_of::<usize>();
 
         self.0[byte_index] |= 1 << bit_index;
     }
 
     // 设置对应bit位为0
     pub fn unset_bit(&mut self, idx: usize) {
-        let byte_index = idx / 8;
-        let bit_index = idx % 8;
+        let byte_index = idx / size_of::<usize>();
+        let bit_index = idx % size_of::<usize>();
 
         self.0[byte_index] &= !(1 << bit_index);
     }

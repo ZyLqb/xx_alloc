@@ -6,5 +6,7 @@ edition = "2021"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-xx_mutex_lock = { git = "https://github.com/ZyLqb/xx_mutex_lock.git", branch = "master" }
-xxos_log ={ git = "https://github.com/MEssap/xxos_log.git",branch = "main" }
+# xx_mutex_lock = { git = "https://github.com/ZyLqb/xx_mutex_lock.git", branch = "master" }
+xxos_log = { git = "https://github.com/MEssap/xxos_log.git", branch = "main" }
+spin = "0.9.8"
+

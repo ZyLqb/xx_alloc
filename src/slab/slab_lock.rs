@@ -1,6 +1,6 @@
 use super::slab_allocator::SlabAllocator;
 use core::alloc::{GlobalAlloc, Layout};
-use xx_mutex_lock::Mutex;
+use spin::Mutex;
 
 pub struct LockedSlab(Mutex<SlabAllocator>);
 
